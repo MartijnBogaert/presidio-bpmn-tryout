@@ -3,7 +3,13 @@
 import io
 
 from .anonymization import mask_spans
-from .bpmn import deserialize_bpmn, extract_elem_from_bpmn, get_element_name, serialize_bpmn, set_element_name
+from .bpmn import (
+    deserialize_bpmn,
+    extract_elem_from_bpmn,
+    get_element_name,
+    serialize_bpmn,
+    set_element_name,
+)
 from .identification import detect_pii
 
 

@@ -25,25 +25,39 @@ BPMN_NS = "http://www.omg.org/spec/BPMN/20100524/MODEL"
 
 # Entity types that are actually relevant for BPMN content
 RELEVANT_ENTITIES = [
-    "EMAIL_ADDRESS", "PHONE_NUMBER", "IBAN_CODE", "CREDIT_CARD",
-    "BELGIAN_NATIONAL_REGISTRY", "PERSON", "LOCATION",
+    "EMAIL_ADDRESS",
+    "PHONE_NUMBER",
+    "IBAN_CODE",
+    "CREDIT_CARD",
+    "BELGIAN_NATIONAL_REGISTRY",
+    "PERSON",
+    "LOCATION",
 ]
 # Added by the Belgian recognizers
-BELGIAN_ENTITIES = ["BE_ENTERPRISE_NUMBER", "BE_LICENSE_PLATE", "BE_ADDRESS", "DATE_OF_BIRTH"]
+BELGIAN_ENTITIES = [
+    "BE_ENTERPRISE_NUMBER",
+    "BE_LICENSE_PLATE",
+    "BE_ADDRESS",
+    "DATE_OF_BIRTH",
+]
 
 
 @dataclass(frozen=True)
 class PipelineConfig:
     name: str = "baseline"
-    entities: Optional[tuple] = None             # None = every entity Presidio knows
+    entities: Optional[tuple] = None  # None = every entity Presidio knows
     default_threshold: float = 0.6
-    thresholds: dict = field(default_factory=dict)  # per entity, overrides default_threshold
-    allow_list: Optional[tuple] = None           # exact, case-insensitive
-    rrn_checksum: bool = False                   # validate the mod-97 check digits
-    acronym_gate: bool = False                   # no PERSON/LOCATION on short all-caps tokens
-    dedup: bool = False                          # review unique values; mask every occurrence
-    scan_text_elements: bool = False             # also <documentation> and <textAnnotation><text>
-    belgian_recognizers: bool = False            # BE phone, KBO, plates, addresses, DOB, RRN with spaces
+    thresholds: dict = field(
+        default_factory=dict
+    )  # per entity, overrides default_threshold
+    allow_list: Optional[tuple] = None  # exact, case-insensitive
+    rrn_checksum: bool = False  # validate the mod-97 check digits
+    acronym_gate: bool = False  # no PERSON/LOCATION on short all-caps tokens
+    dedup: bool = False  # review unique values; mask every occurrence
+    scan_text_elements: bool = False  # also <documentation> and <textAnnotation><text>
+    belgian_recognizers: bool = (
+        False  # BE phone, KBO, plates, addresses, DOB, RRN with spaces
+    )
 
     def __hash__(self):
         return hash(repr(self))
@@ -97,7 +111,11 @@ def rrn_recognizer(checksum: bool, spaces: bool) -> PatternRecognizer:
     kwargs = dict(
         supported_entity="BELGIAN_NATIONAL_REGISTRY",
         supported_language="nl",
-        patterns=[Pattern("BELGIAN_RRN_PATTERN", RRN_REGEX_SPACES if spaces else RRN_REGEX, 0.85)],
+        patterns=[
+            Pattern(
+                "BELGIAN_RRN_PATTERN", RRN_REGEX_SPACES if spaces else RRN_REGEX, 0.85
+            )
+        ],
         context=RRN_CONTEXT,
     )
     if checksum:
@@ -126,7 +144,9 @@ def belgian_recognizers() -> list:
             kbo_is_valid,
             supported_entity="BE_ENTERPRISE_NUMBER",
             supported_language="nl",
-            patterns=[Pattern("KBO", r"\b(?:BE ?)?[01]\d{3}[. ]?\d{3}[. ]?\d{3}\b", 0.6)],
+            patterns=[
+                Pattern("KBO", r"\b(?:BE ?)?[01]\d{3}[. ]?\d{3}[. ]?\d{3}\b", 0.6)
+            ],
             context=["ondernemingsnummer", "KBO", "btw", "btw-nummer"],
         ),
         PatternRecognizer(
@@ -141,7 +161,11 @@ def belgian_recognizers() -> list:
             supported_language="nl",
             patterns=[
                 # street + number + postcode + municipality: must beat a LOCATION hit on the municipality alone
-                Pattern("BE_ADDRESS_FULL", rf"\b(?:{STREET}) {HOUSE_NR},? {POSTCODE_CITY}", 0.9),
+                Pattern(
+                    "BE_ADDRESS_FULL",
+                    rf"\b(?:{STREET}) {HOUSE_NR},? {POSTCODE_CITY}",
+                    0.9,
+                ),
                 Pattern("BE_ADDRESS_STREET", rf"\b(?:{STREET}) {HOUSE_NR}\b", 0.6),
             ],
             context=["adres", "wonende", "woonplaats", "plaatsbezoek"],
@@ -163,22 +187,27 @@ def belgian_recognizers() -> list:
 # Analyzer
 ########################################################################
 
+
 @lru_cache(maxsize=1)
 def nlp_engine():
     """Same NLP configuration as baseline_service/identification.py; built once."""
-    return NlpEngineProvider(nlp_configuration={
-        "nlp_engine_name": "spacy",
-        "models": [
-            {"lang_code": "nl", "model_name": "nl_core_news_md"},
-            {"lang_code": "en", "model_name": "en_core_web_md"},
-        ],
-    }).create_engine()
+    return NlpEngineProvider(
+        nlp_configuration={
+            "nlp_engine_name": "spacy",
+            "models": [
+                {"lang_code": "nl", "model_name": "nl_core_news_md"},
+                {"lang_code": "en", "model_name": "en_core_web_md"},
+            ],
+        }
+    ).create_engine()
 
 
 @lru_cache(maxsize=None)
 def build_analyzer(cfg: PipelineConfig) -> AnalyzerEngine:
     analyzer = AnalyzerEngine(nlp_engine=nlp_engine(), supported_languages=["nl", "en"])
-    analyzer.registry.add_recognizer(rrn_recognizer(cfg.rrn_checksum, spaces=cfg.belgian_recognizers))
+    analyzer.registry.add_recognizer(
+        rrn_recognizer(cfg.rrn_checksum, spaces=cfg.belgian_recognizers)
+    )
     if cfg.belgian_recognizers:
         analyzer.registry.remove_recognizer("PhoneRecognizer", language="nl")
         for rec in belgian_recognizers():
@@ -216,19 +245,31 @@ def detect_text(text: str, cfg: PipelineConfig) -> list:
 
     results = []
     for r in raw:
-        match = text[r.start:r.end]
+        match = text[r.start : r.end]
         if r.score < cfg.thresholds.get(r.entity_type, cfg.default_threshold):
             continue
-        if cfg.acronym_gate and r.entity_type in ("PERSON", "LOCATION") and ACRONYM.match(match):
+        if (
+            cfg.acronym_gate
+            and r.entity_type in ("PERSON", "LOCATION")
+            and ACRONYM.match(match)
+        ):
             continue
-        results.append({"start": r.start, "end": r.end, "entity": r.entity_type,
-                        "score": round(r.score, 3), "match": match})
+        results.append(
+            {
+                "start": r.start,
+                "end": r.end,
+                "entity": r.entity_type,
+                "score": round(r.score, 3),
+                "match": match,
+            }
+        )
     return filter_overlaps(results)
 
 
 ########################################################################
 # BPMN
 ########################################################################
+
 
 def _q(tag):
     return f"{{{BPMN_NS}}}{tag}"
@@ -288,12 +329,17 @@ def anonymize_bpmn(xml: str, approved: list, cfg: PipelineConfig) -> str:
     by_key = {}
     for d in approved:
         by_key.setdefault((d["element_id"], d["location"]), []).append(d)
-    values = {d["match"] for d in approved if d["match"].strip()} if cfg.dedup else set()
+    values = (
+        {d["match"] for d in approved if d["match"].strip()} if cfg.dedup else set()
+    )
 
     for el, element_id, location, text in text_elements(root, cfg):
         spans = list(by_key.get((element_id, location), []))
         for value in values:
-            spans += [{"start": m.start(), "end": m.end()} for m in re.finditer(re.escape(value), text)]
+            spans += [
+                {"start": m.start(), "end": m.end()}
+                for m in re.finditer(re.escape(value), text)
+            ]
         if not spans:
             continue
         masked = mask_spans(text, spans)

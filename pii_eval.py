@@ -36,13 +36,22 @@ KEY = ["file", "element_id", "location"]
 def load_corpus(corpus_dir="data/synthetic"):
     """Return (files, elements, spans): {filename: xml}, one row per text element, one row per PII span."""
     corpus_dir = Path(corpus_dir)
-    files = {p.name: p.read_text(encoding="utf-8") for p in sorted(corpus_dir.glob("*.bpmn"))}
+    files = {
+        p.name: p.read_text(encoding="utf-8") for p in sorted(corpus_dir.glob("*.bpmn"))
+    }
     records = json.loads((corpus_dir / "ground_truth.json").read_text(encoding="utf-8"))
     elements = pd.DataFrame(
-        [{k: v for k, v in r.items() if k != "spans"} | {"n_pii": len(r["spans"])} for r in records]
+        [
+            {k: v for k, v in r.items() if k != "spans"} | {"n_pii": len(r["spans"])}
+            for r in records
+        ]
     )
     spans = pd.DataFrame(
-        [{**{k: r[k] for k in KEY + ["element_type", "text"]}, **s} for r in records for s in r["spans"]]
+        [
+            {**{k: r[k] for k in KEY + ["element_type", "text"]}, **s}
+            for r in records
+            for s in r["spans"]
+        ]
     )
     return files, elements, spans
 
@@ -93,7 +102,11 @@ def match(spans: pd.DataFrame, detections: pd.DataFrame):
     tp, tp_typed, gt_entity = [], [], []
     for row in det.itertuples():
         g = gt_by_key.get((row.file, row.element_id, row.location))
-        over = g[[_overlaps(row.start, row.end, s, e) for s, e in zip(g.start, g.end)]] if g is not None else []
+        over = (
+            g[[_overlaps(row.start, row.end, s, e) for s, e in zip(g.start, g.end)]]
+            if g is not None
+            else []
+        )
         tp.append(len(over) > 0)
         tp_typed.append(bool(len(over) and (over.entity == row.mapped).any()))
         gt_entity.append(", ".join(sorted(set(over.entity))) if len(over) else None)
@@ -118,24 +131,30 @@ def summarize(spans: pd.DataFrame, det: pd.DataFrame, by=None) -> pd.DataFrame:
     precision     = share of detections that touch real PII (only overall / per location,
                     false positives have no ground-truth entity)
     """
-    groups = [("all", spans, det)] if by is None else [
-        (k, g, det[det[by] == k] if by in det.columns else det.iloc[0:0])
-        for k, g in spans.groupby(by)
-    ]
+    groups = (
+        [("all", spans, det)]
+        if by is None
+        else [
+            (k, g, det[det[by] == k] if by in det.columns else det.iloc[0:0])
+            for k, g in spans.groupby(by)
+        ]
+    )
     rows = []
     for name, s, d in groups:
         p, r, f = _prf(d.tp.sum(), len(d), s.hit.sum(), len(s))
-        rows.append({
-            (by or "scope"): name,
-            "n_pii": len(s),
-            "n_detections": len(d),
-            "false_positives": int((~d.tp).sum()),
-            "precision": p,
-            "recall": r,
-            "recall_full": s.full.mean(),
-            "recall_typed": s.hit_typed.mean(),
-            "f1": f,
-        })
+        rows.append(
+            {
+                (by or "scope"): name,
+                "n_pii": len(s),
+                "n_detections": len(d),
+                "false_positives": int((~d.tp).sum()),
+                "precision": p,
+                "recall": r,
+                "recall_full": s.full.mean(),
+                "recall_typed": s.hit_typed.mean(),
+                "f1": f,
+            }
+        )
     out = pd.DataFrame(rows).set_index(by or "scope")
     if by == "entity":  # precision per entity is not well-defined without typed FPs
         out = out.drop(columns=["n_detections", "false_positives", "precision", "f1"])
@@ -165,11 +184,19 @@ def residual_pii(spans: pd.DataFrame, anonymized: dict) -> pd.DataFrame:
         text = element_text(roots[row.file], row.element_id, row.location) or ""
         intact.append(row.value in text)
         tokens = [t for t in re.findall(r"\w+", row.value) if len(t) >= 2]
-        partial.append(any(re.search(rf"(?<!\w){re.escape(t)}(?!\w)", text) for t in tokens))
+        partial.append(
+            any(re.search(rf"(?<!\w){re.escape(t)}(?!\w)", text) for t in tokens)
+        )
     return spans.assign(leaked_intact=intact, leaked=partial)
 
 
-def evaluate(step: str, spans: pd.DataFrame, detections: pd.DataFrame, n_review_items: int, anonymized: dict):
+def evaluate(
+    step: str,
+    spans: pd.DataFrame,
+    detections: pd.DataFrame,
+    n_review_items: int,
+    anonymized: dict,
+):
     """
     One metrics row for a pipeline step, plus the scored spans/detections for drilling down.
 
@@ -205,6 +232,8 @@ def diff_steps(prev: tuple, cur: tuple) -> dict:
     return {
         "pii_gained": cur_spans[~prev_spans.hit & cur_spans.hit][cols],
         "pii_lost": cur_spans[prev_spans.hit & ~cur_spans.hit][cols],
-        "fp_removed": merged[merged._merge == "left_only"][["location", "entity", "match"]],
+        "fp_removed": merged[merged._merge == "left_only"][
+            ["location", "entity", "match"]
+        ],
         "fp_added": added[added._merge == "left_only"][["location", "entity", "match"]],
     }
