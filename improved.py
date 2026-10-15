@@ -8,11 +8,11 @@ improvement on top of that.
 
 import re
 import xml.etree.ElementTree as ET
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from functools import lru_cache
+from functools import cache, lru_cache
 from io import StringIO
 from pathlib import Path
-from typing import Optional
 
 import regex
 from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer
@@ -45,12 +45,12 @@ BELGIAN_ENTITIES = [
 @dataclass(frozen=True)
 class PipelineConfig:
     name: str = "baseline"
-    entities: Optional[tuple] = None  # None = every entity Presidio knows
+    entities: tuple | None = None  # None = every entity Presidio knows
     default_threshold: float = 0.6
     thresholds: dict = field(
         default_factory=dict
     )  # per entity, overrides default_threshold
-    allow_list: Optional[tuple] = None  # exact, case-insensitive
+    allow_list: tuple | None = None  # exact, case-insensitive
     rrn_checksum: bool = False  # validate the mod-97 check digits
     acronym_gate: bool = False  # no PERSON/LOCATION on short all-caps tokens
     dedup: bool = False  # review unique values; mask every occurrence
@@ -97,18 +97,24 @@ def kbo_is_valid(number: str) -> bool:
 
 
 class ChecksumPatternRecognizer(PatternRecognizer):
-    """PatternRecognizer whose matches are dropped when the checksum fails."""
+    """
+    PatternRecognizer whose matches are dropped when the checksum fails.
 
-    def __init__(self, validator, **kwargs):
+    Without a validator it behaves exactly like a plain PatternRecognizer
+    (validate_result returning None means "not validated" to Presidio).
+    """
+
+    def __init__(self, validator: Callable[[str], bool] | None, **kwargs):
         self.validator = validator
         super().__init__(**kwargs)
 
-    def validate_result(self, pattern_text: str) -> bool:
-        return self.validator(pattern_text)
+    def validate_result(self, pattern_text: str) -> bool | None:
+        return self.validator(pattern_text) if self.validator else None
 
 
 def rrn_recognizer(checksum: bool, spaces: bool) -> PatternRecognizer:
-    kwargs = dict(
+    return ChecksumPatternRecognizer(
+        rrn_is_valid if checksum else None,
         supported_entity="BELGIAN_NATIONAL_REGISTRY",
         supported_language="nl",
         patterns=[
@@ -118,9 +124,6 @@ def rrn_recognizer(checksum: bool, spaces: bool) -> PatternRecognizer:
         ],
         context=RRN_CONTEXT,
     )
-    if checksum:
-        return ChecksumPatternRecognizer(rrn_is_valid, **kwargs)
-    return PatternRecognizer(**kwargs)
 
 
 CASE_SENSITIVE = regex.M | regex.S  # PatternRecognizer default also has regex.I
@@ -202,7 +205,7 @@ def nlp_engine():
     ).create_engine()
 
 
-@lru_cache(maxsize=None)
+@cache
 def build_analyzer(cfg: PipelineConfig) -> AnalyzerEngine:
     analyzer = AnalyzerEngine(nlp_engine=nlp_engine(), supported_languages=["nl", "en"])
     analyzer.registry.add_recognizer(
@@ -231,17 +234,28 @@ ACRONYM = re.compile(r"^[A-Z0-9]{2,6}$")
 def detect_text(text: str, cfg: PipelineConfig) -> list:
     """detect_pii from the service, plus the switched-on improvements."""
     analyzer = build_analyzer(cfg)
-    kwargs = {"entities": list(cfg.entities)} if cfg.entities else {}
-    if cfg.allow_list:
-        kwargs.update(
-            allow_list=[rf"^{re.escape(term)}$" for term in cfg.allow_list],
+    entities = list(cfg.entities) if cfg.entities else None
+    # Anchored regexes: a term only suppresses a detection that is exactly that term.
+    # Presidio's default regex_flags for the allow-list already ignore case.
+    allow_list = (
+        [rf"\A{re.escape(term)}\Z" for term in cfg.allow_list]
+        if cfg.allow_list
+        else None
+    )
+
+    def analyze(language: str):
+        return analyzer.analyze(
+            text=text,
+            language=language,
+            entities=entities,
+            allow_list=allow_list,
             allow_list_match="regex",
-            regex_flags=re.IGNORECASE,
         )
+
     try:
-        raw = analyzer.analyze(text=text, language="nl", **kwargs)
+        raw = analyze("nl")
     except ValueError:
-        raw = analyzer.analyze(text=text, language="en", **kwargs)
+        raw = analyze("en")
 
     results = []
     for r in raw:

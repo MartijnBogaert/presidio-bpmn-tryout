@@ -1,0 +1,7 @@
+# These files are a verbatim copy of lblod/pii-identification-anonymization-service
+# (the baseline); keep them identical to the source instead of linting/formatting them.
+extend-exclude = [
+    "baseline_service/identification.py",
+    "baseline_service/anonymization.py",
+    "baseline_service/bpmn.py",
+]

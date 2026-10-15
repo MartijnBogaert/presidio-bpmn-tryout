@@ -738,6 +738,24 @@ class Builder:
         el.insert(0, doc)  # documentation comes first in BPMN
         self.record(el.get("id"), el.tag.split("}")[1], "documentation", text, spans)
 
+    def task(self, process: ET.Element, task_name: str) -> ET.Element:
+        """A task with a PII, clean, jargon or the skeleton's own label, sometimes documented."""
+        r = self.rng
+        roll = r.random()
+        if roll < 0.35:
+            label = self.text(self.cyclers["NAME_PII"].next())
+        elif roll < 0.5:
+            label = self.text(self.cyclers["NAME_CLEAN"].next())
+        elif roll < 0.75:
+            label = self.text(self.cyclers["NAME_JARGON"].next())
+        else:
+            label = (task_name, [])
+        tag = r.choice(["task", "userTask", "userTask", "manualTask", "serviceTask"])
+        task = self.named(process, tag, "Activity", label)
+        if r.random() < 0.35:
+            self.documentation(task)
+        return task
+
     def build(self, proc: dict) -> ET.Element:
         r = self.rng
         defs = ET.Element(
@@ -775,33 +793,14 @@ class Builder:
             lanes.append(self.named(lane_set, "lane", "Lane", (lane_name, spans)))
 
         # Flow nodes: start -> tasks (with a gateway after the first) -> end
-        nodes = []
         start = self.named(process, "startEvent", "StartEvent", (proc["start"], []))
-        nodes.append(start)
-        tasks = []
-        for i, task_name in enumerate(proc["tasks"]):
-            roll = r.random()
-            if roll < 0.35:
-                label = self.text(self.cyclers["NAME_PII"].next())
-            elif roll < 0.5:
-                label = self.text(self.cyclers["NAME_CLEAN"].next())
-            elif roll < 0.75:
-                label = self.text(self.cyclers["NAME_JARGON"].next())
-            else:
-                label = (task_name, [])
-            tag = r.choice(
-                ["task", "userTask", "userTask", "manualTask", "serviceTask"]
-            )
-            task = self.named(process, tag, "Activity", label)
-            if r.random() < 0.35:
-                self.documentation(task)
-            tasks.append(task)
-            nodes.append(task)
-            if i == 0:
-                gateway = self.named(
-                    process, "exclusiveGateway", "Gateway", (proc["gateway"], [])
-                )
-                nodes.append(gateway)
+        first_task, *other_names = proc["tasks"]
+        tasks = [self.task(process, first_task)]
+        gateway = self.named(
+            process, "exclusiveGateway", "Gateway", (proc["gateway"], [])
+        )
+        tasks += [self.task(process, task_name) for task_name in other_names]
+        nodes = [start, tasks[0], gateway, *tasks[1:]]
         end_label = (
             self.text(self.cyclers["NAME_JARGON"].next())
             if r.random() < 0.5
@@ -813,7 +812,7 @@ class Builder:
 
         # Sequence flows (gateway branches labelled Ja / Nee)
         flows = []
-        for src, tgt in zip(nodes, nodes[1:]):
+        for src, tgt in itertools.pairwise(nodes):
             label = ("Ja", []) if src is gateway else None
             flows.append(
                 self.named(
@@ -878,8 +877,8 @@ class Builder:
                 q("association"),
                 {
                     "id": self.new_id("Association"),
-                    "sourceRef": r.choice(tasks).get("id"),
-                    "targetRef": ann.get("id"),
+                    "sourceRef": r.choice(tasks).get("id", ""),
+                    "targetRef": ann.get("id", ""),
                 },
             )
 
@@ -912,11 +911,11 @@ def validate(path: Path, records: list):
         assert el is not None, rec
         if rec["location"] == "name":
             actual = el.get("name")
-        elif rec["location"] == "documentation":
-            actual = el.find("bpmn:documentation", NS).text
         else:
-            actual = el.find("bpmn:text", NS).text
-        assert actual == rec["text"], (actual, rec)
+            child = el.find(f"bpmn:{rec['location']}", NS)
+            assert child is not None, rec
+            actual = child.text
+        assert actual is not None and actual == rec["text"], (actual, rec)
         for span in rec["spans"]:
             assert actual[span["start"] : span["end"]] == span["value"], (actual, span)
 

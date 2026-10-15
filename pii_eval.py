@@ -72,6 +72,15 @@ def _covered(start, end, intervals):
     return pos >= end
 
 
+def _overlapping(group: pd.DataFrame | None, start: int, end: int) -> pd.DataFrame:
+    """Rows of group whose [start, end) overlaps the given span; empty if there is no group."""
+    if group is None:
+        return pd.DataFrame(columns=pd.Index(["start", "end", "entity", "mapped"]))
+    return group.loc[
+        [_overlaps(start, end, s, e) for s, e in zip(group.start, group.end)]
+    ]
+
+
 def match(spans: pd.DataFrame, detections: pd.DataFrame):
     """
     Return (spans, detections) annotated with match flags.
@@ -82,34 +91,27 @@ def match(spans: pd.DataFrame, detections: pd.DataFrame):
     """
     det = detections.copy()
     if det.empty:
-        det = pd.DataFrame(columns=KEY + ["start", "end", "entity"])
+        det = pd.DataFrame(columns=pd.Index([*KEY, "start", "end", "entity"]))
     det["mapped"] = det["entity"].map(lambda e: ENTITY_MAP.get(e, e))
     det_by_key = {k: g for k, g in det.groupby(KEY)}
     gt_by_key = {k: g for k, g in spans.groupby(KEY)}
 
     hit, hit_typed, full = [], [], []
-    for row in spans.itertuples():
-        d = det_by_key.get((row.file, row.element_id, row.location))
-        if d is None:
-            hit.append(False), hit_typed.append(False), full.append(False)
-            continue
-        over = d[[_overlaps(row.start, row.end, s, e) for s, e in zip(d.start, d.end)]]
+    for row in spans.to_dict("records"):
+        key = (row["file"], row["element_id"], row["location"])
+        over = _overlapping(det_by_key.get(key), row["start"], row["end"])
         hit.append(len(over) > 0)
-        hit_typed.append(bool((over.mapped == row.entity).any()))
-        full.append(_covered(row.start, row.end, list(zip(over.start, over.end))))
+        hit_typed.append(bool((over["mapped"] == row["entity"]).any()))
+        full.append(_covered(row["start"], row["end"], list(zip(over.start, over.end))))
     spans = spans.assign(hit=hit, hit_typed=hit_typed, full=full)
 
     tp, tp_typed, gt_entity = [], [], []
-    for row in det.itertuples():
-        g = gt_by_key.get((row.file, row.element_id, row.location))
-        over = (
-            g[[_overlaps(row.start, row.end, s, e) for s, e in zip(g.start, g.end)]]
-            if g is not None
-            else []
-        )
+    for row in det.to_dict("records"):
+        key = (row["file"], row["element_id"], row["location"])
+        over = _overlapping(gt_by_key.get(key), row["start"], row["end"])
         tp.append(len(over) > 0)
-        tp_typed.append(bool(len(over) and (over.entity == row.mapped).any()))
-        gt_entity.append(", ".join(sorted(set(over.entity))) if len(over) else None)
+        tp_typed.append(bool((over["entity"] == row["mapped"]).any()))
+        gt_entity.append(", ".join(sorted(set(over["entity"]))) if len(over) else None)
     det = det.assign(tp=tp, tp_typed=tp_typed, gt_entity=gt_entity)
     return spans, det
 
@@ -180,10 +182,11 @@ def residual_pii(spans: pd.DataFrame, anonymized: dict) -> pd.DataFrame:
     """
     roots = {f: ET.fromstring(xml) for f, xml in anonymized.items()}
     intact, partial = [], []
-    for row in spans.itertuples():
-        text = element_text(roots[row.file], row.element_id, row.location) or ""
-        intact.append(row.value in text)
-        tokens = [t for t in re.findall(r"\w+", row.value) if len(t) >= 2]
+    for row in spans.to_dict("records"):
+        root = roots[row["file"]]
+        text = element_text(root, row["element_id"], row["location"]) or ""
+        intact.append(row["value"] in text)
+        tokens = [t for t in re.findall(r"\w+", row["value"]) if len(t) >= 2]
         partial.append(
             any(re.search(rf"(?<!\w){re.escape(t)}(?!\w)", text) for t in tokens)
         )
