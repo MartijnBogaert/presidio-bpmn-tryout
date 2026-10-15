@@ -10,14 +10,14 @@ import re
 import xml.etree.ElementTree as ET
 from collections import Counter
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields, replace
 from functools import cache, lru_cache
 from io import StringIO
 from pathlib import Path
 
 import regex
 from presidio_analyzer import AnalyzerEngine, Pattern, PatternRecognizer
-from presidio_analyzer.nlp_engine import NlpEngineProvider
+from presidio_analyzer.nlp_engine import NlpEngineProvider, SpacyNlpEngine
 from presidio_analyzer.predefined_recognizers import PhoneRecognizer
 
 from baseline_service.anonymization import mask_spans
@@ -62,9 +62,9 @@ class PipelineConfig:
     extend_names: bool = False  # grow PERSON matches over surname particles
     mask_name_parts: bool = False  # with dedup: also mask the parts of approved names
     whole_document: bool = False  # analyze one text per diagram instead of per element
-    document_labels: bool = (
-        False  # with whole_document: prefix lines with the element type
-    )
+    # with whole_document: "lines" (XML order), "typed" (+ element type per line),
+    # "flow" (typed, in process-flow order) or "story" (flow order, framed as sentences)
+    document_layout: str = "lines"
 
     def __hash__(self):
         return hash(repr(self))
@@ -212,6 +212,13 @@ def nlp_engine():
     ).create_engine()
 
 
+def spacy_model(language: str = "nl"):
+    """The spaCy model that Presidio uses for a language (for inspecting NER output)."""
+    engine = nlp_engine()
+    assert isinstance(engine, SpacyNlpEngine) and engine.nlp is not None
+    return engine.nlp[language]
+
+
 @cache
 def build_analyzer(cfg: PipelineConfig) -> AnalyzerEngine:
     analyzer = AnalyzerEngine(nlp_engine=nlp_engine(), supported_languages=["nl", "en"])
@@ -301,6 +308,11 @@ def detect_text(text: str, cfg: PipelineConfig) -> list:
         raw = analyze("nl")
     except ValueError:
         raw = analyze("en")
+    # Presidio orders equal-score results of the same span via a set, which changes from
+    # run to run (hash seed); break such ties by entity type so results are reproducible.
+    raw = sorted(
+        raw, key=lambda r: (-r.score, r.start, -(r.end - r.start), r.entity_type)
+    )
 
     results = []
     for r in raw:
@@ -354,7 +366,7 @@ def text_elements(root: ET.Element, cfg: PipelineConfig) -> list:
     return out
 
 
-# Line prefixes for document_labels
+# Line prefixes for the "typed" and "flow" layouts
 ELEMENT_LABELS = {
     "participant": "Pool", "lane": "Lane",
     "task": "Taak", "userTask": "Taak", "manualTask": "Taak", "serviceTask": "Taak",
@@ -363,25 +375,72 @@ ELEMENT_LABELS = {
     "documentation": "Documentatie", "text": "Notitie",
 }  # fmt: skip
 
+TASKS = {
+    "task", "userTask", "manualTask", "serviceTask", "sendTask", "receiveTask",
+    "scriptTask", "businessRuleTask", "callActivity", "subProcess",
+}  # fmt: skip
+GATEWAYS = {
+    "exclusiveGateway",
+    "inclusiveGateway",
+    "parallelGateway",
+    "eventBasedGateway",
+    "complexGateway",
+}
+EVENTS = {"intermediateCatchEvent", "intermediateThrowEvent", "boundaryEvent"}
+LOCATION_ORDER = {"name": 0, "documentation": 1, "text": 2}
+
+
+def _local(tag: str) -> str:
+    return tag.split("}")[-1]
+
+
+def _kind(item: tuple) -> str:
+    """Element type of a text element: the tag for a name, else 'documentation' / 'text'."""
+    el, _, location, _ = item
+    return _local(el.tag) if location == "name" else location
+
 
 def bpmn_document(xml: str, cfg: PipelineConfig) -> tuple[str, list[dict]]:
     """
-    All scanned text of a diagram as one document, one element per line in document
-    order (an element's name, then its documentation). Lines without closing
-    punctuation get a "." so the NLP model sees sentence boundaries.
+    All scanned text of a diagram as one document, for a single analyze call.
+
+    Layouts (cfg.document_layout):
+    - "lines": one element per line in document order (a name, then its documentation)
+    - "typed": the same, each line prefixed with the element type ("Taak: ...")
+    - "flow":  typed lines, ordered along the process flow
+    - "story": flow order, each element framed as a Dutch sentence
+    Lines without closing punctuation get a "." so the NLP model sees sentence boundaries.
 
     Returns (text, segments); each segment maps text[start:end] back to
     (element_id, location) and equals that element's stripped text.
     """
     root = ET.fromstring(xml)
-    order = {el: i for i, el in enumerate(root.iter())}
-    elements = sorted(text_elements(root, cfg), key=lambda t: order[t[0]])
+    items = text_elements(root, cfg)
+    layout = cfg.document_layout
+    if layout in ("lines", "typed"):
+        order = {el: i for i, el in enumerate(root.iter())}
+        items = sorted(items, key=lambda t: order[t[0]])
+    elif layout in ("flow", "story"):
+        items = _flow_order(root, items)
+    else:
+        raise ValueError(f"unknown document_layout {layout!r}")
+
+    if layout == "story":
+        pieces = _story_frames(root, items)
+    elif layout == "lines":
+        pieces = [("", item, "") for item in items]
+    else:
+        pieces = [(f"{ELEMENT_LABELS.get(_kind(t), _kind(t))}: ", t, "") for t in items]
+    return _write_document(pieces)
+
+
+def _write_document(pieces: list) -> tuple[str, list[dict]]:
+    """(frame before, text element, frame after) per line -> (text, segments)."""
     lines, segments, pos = [], [], 0
-    for el, element_id, location, text in elements:
-        tag = el.tag.split("}")[-1] if location == "name" else location
-        prefix = f"{ELEMENT_LABELS.get(tag, tag)}: " if cfg.document_labels else ""
-        line = prefix + text + ("\n" if text[-1] in ".!?:" else ".\n")
-        start = pos + len(prefix)
+    for before, (_, element_id, location, text), after in pieces:
+        end = after or ("" if text[-1] in ".!?:" else ".")
+        line = before + text + end + "\n"
+        start = pos + len(before)
         segments.append(
             {
                 "start": start,
@@ -393,6 +452,130 @@ def bpmn_document(xml: str, cfg: PipelineConfig) -> tuple[str, list[dict]]:
         lines.append(line)
         pos += len(line)
     return "".join(lines), segments
+
+
+def _flow_order(root: ET.Element, items: list) -> list:
+    """
+    Text elements ordered along the process: pools and lanes first, then per process the
+    flow nodes depth-first from the start events (each followed by its documentation, its
+    labelled outgoing flows and the annotations attached to it), then the remaining
+    elements of the process (data objects, ...), then message flows and anything left.
+    Every text element appears exactly once.
+    """
+    parent = {child: p for p in root.iter() for child in p}
+    owner = {id(t): t[0] if t[2] == "name" else parent[t[0]] for t in items}
+    by_owner: dict = {}
+    for t in sorted(items, key=lambda t: LOCATION_ORDER[t[2]]):
+        by_owner.setdefault(owner[id(t)], []).append(t)
+    doc_order = {el: i for i, el in enumerate(root.iter())}
+    by_id = {el.get("id"): el for el in root.iter() if el.get("id")}
+
+    ordered, done = [], set()
+
+    def emit(el):
+        if el is not None and el not in done:
+            done.add(el)
+            ordered.extend(by_owner.get(el, []))
+
+    def visit(node, outgoing: dict, attached: dict):
+        """A flow node, its annotations, then each outgoing flow and its target (depth-first)."""
+        if node is None or node in done:
+            return
+        emit(node)
+        for annotation in attached.get(node.get("id"), []):
+            emit(annotation)
+        for f in outgoing.get(node.get("id"), []):
+            emit(f)
+            visit(by_id.get(f.get("targetRef")), outgoing, attached)
+
+    for tag in ("participant", "lane"):
+        for el in root.iter(_q(tag)):
+            emit(el)
+
+    for process in root.iter(_q("process")):
+        children = list(process)
+        flows = [c for c in children if _local(c.tag) == "sequenceFlow"]
+        outgoing: dict = {}
+        for f in flows:
+            outgoing.setdefault(f.get("sourceRef"), []).append(f)
+        attached: dict = {}  # node id -> text annotations connected to it
+        for a in (c for c in children if _local(c.tag) == "association"):
+            src, tgt = by_id.get(a.get("sourceRef")), by_id.get(a.get("targetRef"))
+            for node, other in ((src, tgt), (tgt, src)):
+                if (
+                    node is not None
+                    and other is not None
+                    and _local(other.tag) == "textAnnotation"
+                ):
+                    attached.setdefault(node.get("id"), []).append(other)
+
+        for start in (c for c in children if _local(c.tag) == "startEvent"):
+            visit(start, outgoing, attached)
+        for c in children:  # unreached nodes, data objects, loose annotations, ...
+            visit(c, outgoing, attached)
+
+    for el in sorted(
+        by_owner, key=lambda el: doc_order[el]
+    ):  # message flows and the rest
+        emit(el)
+    assert len(ordered) == len(items)
+    return ordered
+
+
+def _story_frames(root: ET.Element, items: list) -> list:
+    """Frame each text element (in flow order) as a Dutch sentence: (before, item, after)."""
+    by_id = {el.get("id"): el for el in root.iter() if el.get("id")}
+    step: dict = {}  # task id -> step number, in story order
+    for el, element_id, location, _ in items:
+        if location == "name" and _local(el.tag) in TASKS and element_id not in step:
+            step[element_id] = len(step) + 1
+
+    def where_to(flow_id):
+        # an element without children is falsy, so test for None explicitly
+        flow = by_id.get(flow_id)
+        target = by_id.get(flow.get("targetRef")) if flow is not None else None
+        kind = _local(target.tag) if target is not None else ""
+        if kind in TASKS and target is not None and target.get("id") in step:
+            return f" gaat het verder met stap {step[target.get('id')]}."
+        if kind == "endEvent":
+            return " gaat het verder naar het einde."
+        if kind in GATEWAYS:
+            return " volgt een nieuwe beslissing."
+        return " gaat het proces verder."
+
+    pieces = []
+    for item in items:
+        el, element_id, location, _ = item
+        kind = _kind(item)
+        after = ""
+        if kind == "documentation":
+            before = "Toelichting: "
+        elif kind == "text":
+            before = "Opmerking: "
+        elif kind == "participant":
+            before = "Dit proces heet: " if el.get("processRef") else "Externe partij: "
+        elif kind == "lane":
+            before = "Betrokken in dit proces: "
+        elif kind == "startEvent":
+            before = "Het proces begint met: "
+        elif kind in TASKS:
+            before = f"Stap {step.get(element_id, '')}: "
+        elif kind in GATEWAYS:
+            before = "Daarna volgt de beslissing: "
+        elif kind == "sequenceFlow":
+            before, after = "Bij antwoord ", where_to(element_id)
+        elif kind in EVENTS:
+            before = "Daarna gebeurt: "
+        elif kind == "endEvent":
+            before = "Het proces eindigt met: "
+        elif kind in ("dataObjectReference", "dataStoreReference"):
+            before = "Gebruikt document: "
+        elif kind == "messageFlow":
+            before = "Bericht van de externe partij: "
+        else:
+            before = f"{kind}: "
+        pieces.append((before, item, after))
+    return pieces
 
 
 def detect_bpmn(xml: str, cfg: PipelineConfig) -> list:
@@ -490,3 +673,54 @@ def anonymize_bpmn(xml: str, approved: list, cfg: PipelineConfig) -> str:
         else:
             el.text = masked
     return ET.tostring(root, encoding="utf-8", xml_declaration=True).decode("utf-8")
+
+
+########################################################################
+# The cumulative improvement steps (notebooks 02 and 03)
+########################################################################
+
+# Step 2: NER results always score 0.85, so only the pattern-based bars really change
+THRESHOLDS = {
+    "PERSON": 0.85,
+    "LOCATION": 0.85,
+    "EMAIL_ADDRESS": 0.5,
+    "IBAN_CODE": 0.5,
+    "CREDIT_CARD": 0.5,
+    "BELGIAN_NATIONAL_REGISTRY": 0.5,
+    "PHONE_NUMBER": 0.4,
+}
+
+
+def cumulative_steps(allow_list_path="allow_list.txt") -> dict[str, PipelineConfig]:
+    """Steps 0-11: the baseline, then one improvement at a time on top of the previous step."""
+    steps = {}
+    cfg = PipelineConfig(name="0 baseline")
+    steps[cfg.name] = cfg
+
+    def add(name: str, **changes):
+        nonlocal cfg
+        cfg = replace(cfg, name=name, **changes)
+        steps[name] = cfg
+
+    all_entities = RELEVANT_ENTITIES + BELGIAN_ENTITIES
+    add("1 entity filter", entities=tuple(RELEVANT_ENTITIES))
+    add("2 thresholds", thresholds=THRESHOLDS)
+    add("3 allow-list", allow_list=load_allow_list(allow_list_path))
+    add("4 RRN checksum", rrn_checksum=True)
+    add("5 acronym gate", acronym_gate=True)
+    add("6 dedup", dedup=True)
+    add("7 documentation + annotations", scan_text_elements=True)
+    add("8 Belgian recognizers", belgian_recognizers=True, entities=tuple(all_entities))
+    add("9 no LOCATION", entities=tuple(e for e in all_entities if e != "LOCATION"))
+    add("10 name particles", extend_names=True)
+    add("11 name parts", mask_name_parts=True)
+    return steps
+
+
+def changed_settings(prev: PipelineConfig, cfg: PipelineConfig) -> dict:
+    """{setting: (old, new)} for every setting that differs, apart from the name."""
+    return {
+        f.name: (getattr(prev, f.name), getattr(cfg, f.name))
+        for f in fields(cfg)
+        if f.name != "name" and getattr(prev, f.name) != getattr(cfg, f.name)
+    }
