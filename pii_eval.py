@@ -24,6 +24,10 @@ ENTITY_MAP = {
     "IBAN_CODE": "IBAN",
     "LOCATION": "ADDRESS",
     "DATE_TIME": "DATE_OF_BIRTH",
+    "DATE_OF_BIRTH": "DATE_OF_BIRTH",
+    "BE_ADDRESS": "ADDRESS",
+    "BE_ENTERPRISE_NUMBER": "KBO",
+    "BE_LICENSE_PLATE": "LICENSE_PLATE",
 }
 
 KEY = ["file", "element_id", "location"]
@@ -163,3 +167,44 @@ def residual_pii(spans: pd.DataFrame, anonymized: dict) -> pd.DataFrame:
         tokens = [t for t in re.findall(r"\w+", row.value) if len(t) >= 2]
         partial.append(any(re.search(rf"(?<!\w){re.escape(t)}(?!\w)", text) for t in tokens))
     return spans.assign(leaked_intact=intact, leaked=partial)
+
+
+def evaluate(step: str, spans: pd.DataFrame, detections: pd.DataFrame, n_review_items: int, anonymized: dict):
+    """
+    One metrics row for a pipeline step, plus the scored spans/detections for drilling down.
+
+    n_review_items is the length of the list a reviewer has to go through (all files together).
+    """
+    scored_spans, scored_det = match(spans, detections)
+    residual = residual_pii(spans, anonymized)
+    overall = summarize(scored_spans, scored_det).iloc[0]
+    row = {
+        "step": step,
+        **overall.to_dict(),
+        "review_items": n_review_items,
+        "residual_pii": round(residual.leaked.mean(), 3),
+    }
+    return row, scored_spans.assign(leaked=residual.leaked), scored_det
+
+
+DET_KEY = KEY + ["start", "end", "entity"]
+
+
+def diff_steps(prev: tuple, cur: tuple) -> dict:
+    """
+    What changed between two steps, given (scored_spans, scored_det) of each.
+
+    Returns DataFrames: pii_gained / pii_lost (spans newly touched / no longer touched),
+    fp_removed / fp_added (false-positive detections that disappeared / appeared).
+    """
+    (prev_spans, prev_det), (cur_spans, cur_det) = prev, cur
+    cols = ["file", "location", "entity", "value", "text"]
+    fp_prev, fp_cur = prev_det[~prev_det.tp], cur_det[~cur_det.tp]
+    merged = fp_prev.merge(fp_cur[DET_KEY], on=DET_KEY, how="outer", indicator=True)
+    added = fp_cur.merge(fp_prev[DET_KEY], on=DET_KEY, how="left", indicator=True)
+    return {
+        "pii_gained": cur_spans[~prev_spans.hit & cur_spans.hit][cols],
+        "pii_lost": cur_spans[prev_spans.hit & ~cur_spans.hit][cols],
+        "fp_removed": merged[merged._merge == "left_only"][["location", "entity", "match"]],
+        "fp_added": added[added._merge == "left_only"][["location", "entity", "match"]],
+    }

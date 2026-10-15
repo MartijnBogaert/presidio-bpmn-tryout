@@ -1,0 +1,25 @@
+# Domain vocabulary that recurs across OPH process diagrams and is never PII.
+# One term per line; matched exactly against a detection, case-insensitive.
+
+# Terms from the improvement overview
+DOSIS
+KBO
+ADM
+ICM
+GaNaar
+Afgerond
+Herinnering
+Authentication
+moraliteitsonderzoek
+
+# Generic process / organisation vocabulary
+Burgerzaken
+Burgemeester
+Schepencollege
+College
+Gemeenteraad
+Aanvrager
+Inwoner
+Organisator
+Ja
+Nee
