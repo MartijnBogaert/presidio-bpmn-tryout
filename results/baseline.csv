@@ -1,0 +1,14 @@
+approach,scope,n_pii,n_detections,false_positives,precision,recall,recall_full,recall_typed,f1,group,residual_pii
+baseline,all,205,164.0,62.0,0.622,0.463,0.385,0.4,0.531,overall,0.6
+baseline,documentation,62,0.0,0.0,,0.0,0.0,0.0,,location,1.0
+baseline,name,109,164.0,62.0,0.622,0.872,0.725,0.752,0.726,location,0.248
+baseline,text,34,0.0,0.0,,0.0,0.0,0.0,,location,1.0
+baseline,ADDRESS,14,,,,0.286,0.0,0.286,,entity,1.0
+baseline,DATE_OF_BIRTH,8,,,,0.625,0.625,0.625,,entity,0.375
+baseline,EMAIL,20,,,,0.5,0.5,0.5,,entity,0.5
+baseline,IBAN,12,,,,0.417,0.417,0.417,,entity,0.583
+baseline,KBO,8,,,,0.0,0.0,0.0,,entity,1.0
+baseline,LICENSE_PLATE,8,,,,0.0,0.0,0.0,,entity,1.0
+baseline,PERSON,95,,,,0.568,0.537,0.568,,entity,0.453
+baseline,PHONE,21,,,,0.381,0.143,0.0,,entity,0.762
+baseline,RRN,19,,,,0.474,0.263,0.211,,entity,0.737

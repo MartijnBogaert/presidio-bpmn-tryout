@@ -1,0 +1,157 @@
+approach,scope,n_pii,n_detections,false_positives,precision,recall,recall_full,recall_typed,f1,group,residual_pii
+0 baseline,all,205,164.0,62.0,0.622,0.463,0.385,0.405,0.531,overall,0.6
+0 baseline,documentation,62,0.0,0.0,,0.0,0.0,0.0,,location,1.0
+0 baseline,name,109,164.0,62.0,0.622,0.872,0.725,0.761,0.726,location,0.248
+0 baseline,text,34,0.0,0.0,,0.0,0.0,0.0,,location,1.0
+0 baseline,ADDRESS,14,,,,0.286,0.0,0.286,,entity,1.0
+0 baseline,DATE_OF_BIRTH,8,,,,0.625,0.625,0.625,,entity,0.375
+0 baseline,EMAIL,20,,,,0.5,0.5,0.5,,entity,0.5
+0 baseline,IBAN,12,,,,0.417,0.417,0.417,,entity,0.583
+0 baseline,KBO,8,,,,0.0,0.0,0.0,,entity,1.0
+0 baseline,LICENSE_PLATE,8,,,,0.0,0.0,0.0,,entity,1.0
+0 baseline,PERSON,95,,,,0.568,0.537,0.568,,entity,0.453
+0 baseline,PHONE,21,,,,0.381,0.143,0.0,,entity,0.762
+0 baseline,RRN,19,,,,0.474,0.263,0.263,,entity,0.737
+1 entity filter,all,205,130.0,49.0,0.623,0.385,0.346,0.38,0.476,overall,0.644
+1 entity filter,documentation,62,0.0,0.0,,0.0,0.0,0.0,,location,1.0
+1 entity filter,name,109,130.0,49.0,0.623,0.725,0.651,0.716,0.67,location,0.33
+1 entity filter,text,34,0.0,0.0,,0.0,0.0,0.0,,location,1.0
+1 entity filter,ADDRESS,14,,,,0.286,0.0,0.286,,entity,1.0
+1 entity filter,DATE_OF_BIRTH,8,,,,0.0,0.0,0.0,,entity,1.0
+1 entity filter,EMAIL,20,,,,0.5,0.5,0.5,,entity,0.5
+1 entity filter,IBAN,12,,,,0.417,0.417,0.417,,entity,0.583
+1 entity filter,KBO,8,,,,0.0,0.0,0.0,,entity,1.0
+1 entity filter,LICENSE_PLATE,8,,,,0.0,0.0,0.0,,entity,1.0
+1 entity filter,PERSON,95,,,,0.568,0.537,0.568,,entity,0.453
+1 entity filter,PHONE,21,,,,0.048,0.0,0.0,,entity,0.952
+1 entity filter,RRN,19,,,,0.263,0.263,0.263,,entity,0.737
+2 thresholds,all,205,142.0,49.0,0.655,0.444,0.405,0.415,0.529,overall,0.585
+2 thresholds,documentation,62,0.0,0.0,,0.0,0.0,0.0,,location,1.0
+2 thresholds,name,109,142.0,49.0,0.655,0.835,0.761,0.78,0.734,location,0.22
+2 thresholds,text,34,0.0,0.0,,0.0,0.0,0.0,,location,1.0
+2 thresholds,ADDRESS,14,,,,0.286,0.0,0.286,,entity,1.0
+2 thresholds,DATE_OF_BIRTH,8,,,,0.0,0.0,0.0,,entity,1.0
+2 thresholds,EMAIL,20,,,,0.5,0.5,0.5,,entity,0.5
+2 thresholds,IBAN,12,,,,0.417,0.417,0.417,,entity,0.583
+2 thresholds,KBO,8,,,,0.625,0.625,0.0,,entity,0.375
+2 thresholds,LICENSE_PLATE,8,,,,0.0,0.0,0.0,,entity,1.0
+2 thresholds,PERSON,95,,,,0.568,0.537,0.568,,entity,0.453
+2 thresholds,PHONE,21,,,,0.381,0.333,0.333,,entity,0.619
+2 thresholds,RRN,19,,,,0.263,0.263,0.263,,entity,0.737
+3 allow-list,all,205,128.0,35.0,0.727,0.444,0.405,0.415,0.551,overall,0.585
+3 allow-list,documentation,62,0.0,0.0,,0.0,0.0,0.0,,location,1.0
+3 allow-list,name,109,128.0,35.0,0.727,0.835,0.761,0.78,0.777,location,0.22
+3 allow-list,text,34,0.0,0.0,,0.0,0.0,0.0,,location,1.0
+3 allow-list,ADDRESS,14,,,,0.286,0.0,0.286,,entity,1.0
+3 allow-list,DATE_OF_BIRTH,8,,,,0.0,0.0,0.0,,entity,1.0
+3 allow-list,EMAIL,20,,,,0.5,0.5,0.5,,entity,0.5
+3 allow-list,IBAN,12,,,,0.417,0.417,0.417,,entity,0.583
+3 allow-list,KBO,8,,,,0.625,0.625,0.0,,entity,0.375
+3 allow-list,LICENSE_PLATE,8,,,,0.0,0.0,0.0,,entity,1.0
+3 allow-list,PERSON,95,,,,0.568,0.537,0.568,,entity,0.453
+3 allow-list,PHONE,21,,,,0.381,0.333,0.333,,entity,0.619
+3 allow-list,RRN,19,,,,0.263,0.263,0.263,,entity,0.737
+4 RRN checksum,all,205,128.0,35.0,0.727,0.444,0.41,0.42,0.551,overall,0.585
+4 RRN checksum,documentation,62,0.0,0.0,,0.0,0.0,0.0,,location,1.0
+4 RRN checksum,name,109,128.0,35.0,0.727,0.835,0.771,0.789,0.777,location,0.22
+4 RRN checksum,text,34,0.0,0.0,,0.0,0.0,0.0,,location,1.0
+4 RRN checksum,ADDRESS,14,,,,0.286,0.0,0.286,,entity,1.0
+4 RRN checksum,DATE_OF_BIRTH,8,,,,0.0,0.0,0.0,,entity,1.0
+4 RRN checksum,EMAIL,20,,,,0.5,0.5,0.5,,entity,0.5
+4 RRN checksum,IBAN,12,,,,0.417,0.417,0.417,,entity,0.583
+4 RRN checksum,KBO,8,,,,0.625,0.625,0.0,,entity,0.375
+4 RRN checksum,LICENSE_PLATE,8,,,,0.0,0.0,0.0,,entity,1.0
+4 RRN checksum,PERSON,95,,,,0.568,0.537,0.568,,entity,0.453
+4 RRN checksum,PHONE,21,,,,0.381,0.381,0.381,,entity,0.619
+4 RRN checksum,RRN,19,,,,0.263,0.263,0.263,,entity,0.737
+5 acronym gate,all,205,128.0,35.0,0.727,0.444,0.41,0.42,0.551,overall,0.585
+5 acronym gate,documentation,62,0.0,0.0,,0.0,0.0,0.0,,location,1.0
+5 acronym gate,name,109,128.0,35.0,0.727,0.835,0.771,0.789,0.777,location,0.22
+5 acronym gate,text,34,0.0,0.0,,0.0,0.0,0.0,,location,1.0
+5 acronym gate,ADDRESS,14,,,,0.286,0.0,0.286,,entity,1.0
+5 acronym gate,DATE_OF_BIRTH,8,,,,0.0,0.0,0.0,,entity,1.0
+5 acronym gate,EMAIL,20,,,,0.5,0.5,0.5,,entity,0.5
+5 acronym gate,IBAN,12,,,,0.417,0.417,0.417,,entity,0.583
+5 acronym gate,KBO,8,,,,0.625,0.625,0.0,,entity,0.375
+5 acronym gate,LICENSE_PLATE,8,,,,0.0,0.0,0.0,,entity,1.0
+5 acronym gate,PERSON,95,,,,0.568,0.537,0.568,,entity,0.453
+5 acronym gate,PHONE,21,,,,0.381,0.381,0.381,,entity,0.619
+5 acronym gate,RRN,19,,,,0.263,0.263,0.263,,entity,0.737
+6 dedup,all,205,128.0,35.0,0.727,0.444,0.41,0.42,0.551,overall,0.585
+6 dedup,documentation,62,0.0,0.0,,0.0,0.0,0.0,,location,1.0
+6 dedup,name,109,128.0,35.0,0.727,0.835,0.771,0.789,0.777,location,0.22
+6 dedup,text,34,0.0,0.0,,0.0,0.0,0.0,,location,1.0
+6 dedup,ADDRESS,14,,,,0.286,0.0,0.286,,entity,1.0
+6 dedup,DATE_OF_BIRTH,8,,,,0.0,0.0,0.0,,entity,1.0
+6 dedup,EMAIL,20,,,,0.5,0.5,0.5,,entity,0.5
+6 dedup,IBAN,12,,,,0.417,0.417,0.417,,entity,0.583
+6 dedup,KBO,8,,,,0.625,0.625,0.0,,entity,0.375
+6 dedup,LICENSE_PLATE,8,,,,0.0,0.0,0.0,,entity,1.0
+6 dedup,PERSON,95,,,,0.568,0.537,0.568,,entity,0.453
+6 dedup,PHONE,21,,,,0.381,0.381,0.381,,entity,0.619
+6 dedup,RRN,19,,,,0.263,0.263,0.263,,entity,0.737
+7 documentation + annotations,all,205,226.0,45.0,0.801,0.839,0.727,0.8,0.82,overall,0.254
+7 documentation + annotations,documentation,62,61.0,7.0,0.885,0.806,0.645,0.758,0.844,location,0.355
+7 documentation + annotations,name,109,128.0,35.0,0.727,0.835,0.771,0.789,0.777,location,0.202
+7 documentation + annotations,text,34,37.0,3.0,0.919,0.912,0.735,0.912,0.915,location,0.235
+7 documentation + annotations,ADDRESS,14,,,,1.0,0.0,1.0,,entity,1.0
+7 documentation + annotations,DATE_OF_BIRTH,8,,,,0.0,0.0,0.0,,entity,1.0
+7 documentation + annotations,EMAIL,20,,,,1.0,1.0,1.0,,entity,0.0
+7 documentation + annotations,IBAN,12,,,,1.0,1.0,1.0,,entity,0.0
+7 documentation + annotations,KBO,8,,,,1.0,1.0,0.0,,entity,0.0
+7 documentation + annotations,LICENSE_PLATE,8,,,,0.0,0.0,0.0,,entity,1.0
+7 documentation + annotations,PERSON,95,,,,0.968,0.874,0.968,,entity,0.063
+7 documentation + annotations,PHONE,21,,,,0.714,0.714,0.714,,entity,0.286
+7 documentation + annotations,RRN,19,,,,0.579,0.579,0.579,,entity,0.526
+8 Belgian recognizers,all,205,246.0,40.0,0.837,0.985,0.941,0.98,0.905,overall,0.029
+8 Belgian recognizers,documentation,62,69.0,5.0,0.928,1.0,0.935,0.984,0.962,location,0.032
+8 Belgian recognizers,name,109,142.0,35.0,0.754,0.972,0.945,0.972,0.849,location,0.028
+8 Belgian recognizers,text,34,35.0,0.0,1.0,1.0,0.941,1.0,1.0,location,0.029
+8 Belgian recognizers,ADDRESS,14,,,,1.0,1.0,1.0,,entity,0.0
+8 Belgian recognizers,DATE_OF_BIRTH,8,,,,1.0,1.0,1.0,,entity,0.0
+8 Belgian recognizers,EMAIL,20,,,,1.0,1.0,1.0,,entity,0.0
+8 Belgian recognizers,IBAN,12,,,,1.0,1.0,1.0,,entity,0.0
+8 Belgian recognizers,KBO,8,,,,1.0,1.0,1.0,,entity,0.0
+8 Belgian recognizers,LICENSE_PLATE,8,,,,1.0,1.0,1.0,,entity,0.0
+8 Belgian recognizers,PERSON,95,,,,0.968,0.874,0.968,,entity,0.063
+8 Belgian recognizers,PHONE,21,,,,1.0,1.0,0.952,,entity,0.0
+8 Belgian recognizers,RRN,19,,,,1.0,1.0,1.0,,entity,0.0
+9 no LOCATION,all,205,216.0,10.0,0.954,0.985,0.941,0.98,0.969,overall,0.029
+9 no LOCATION,documentation,62,66.0,2.0,0.97,1.0,0.935,0.984,0.985,location,0.032
+9 no LOCATION,name,109,115.0,8.0,0.93,0.972,0.945,0.972,0.951,location,0.028
+9 no LOCATION,text,34,35.0,0.0,1.0,1.0,0.941,1.0,1.0,location,0.029
+9 no LOCATION,ADDRESS,14,,,,1.0,1.0,1.0,,entity,0.0
+9 no LOCATION,DATE_OF_BIRTH,8,,,,1.0,1.0,1.0,,entity,0.0
+9 no LOCATION,EMAIL,20,,,,1.0,1.0,1.0,,entity,0.0
+9 no LOCATION,IBAN,12,,,,1.0,1.0,1.0,,entity,0.0
+9 no LOCATION,KBO,8,,,,1.0,1.0,1.0,,entity,0.0
+9 no LOCATION,LICENSE_PLATE,8,,,,1.0,1.0,1.0,,entity,0.0
+9 no LOCATION,PERSON,95,,,,0.968,0.874,0.968,,entity,0.063
+9 no LOCATION,PHONE,21,,,,1.0,1.0,0.952,,entity,0.0
+9 no LOCATION,RRN,19,,,,1.0,1.0,1.0,,entity,0.0
+10 name particles,all,205,213.0,10.0,0.953,0.985,0.976,0.98,0.969,overall,0.024
+10 name particles,documentation,62,65.0,2.0,0.969,1.0,0.968,0.984,0.984,location,0.032
+10 name particles,name,109,114.0,8.0,0.93,0.972,0.972,0.972,0.951,location,0.028
+10 name particles,text,34,34.0,0.0,1.0,1.0,1.0,1.0,1.0,location,0.0
+10 name particles,ADDRESS,14,,,,1.0,1.0,1.0,,entity,0.0
+10 name particles,DATE_OF_BIRTH,8,,,,1.0,1.0,1.0,,entity,0.0
+10 name particles,EMAIL,20,,,,1.0,1.0,1.0,,entity,0.0
+10 name particles,IBAN,12,,,,1.0,1.0,1.0,,entity,0.0
+10 name particles,KBO,8,,,,1.0,1.0,1.0,,entity,0.0
+10 name particles,LICENSE_PLATE,8,,,,1.0,1.0,1.0,,entity,0.0
+10 name particles,PERSON,95,,,,0.968,0.947,0.968,,entity,0.053
+10 name particles,PHONE,21,,,,1.0,1.0,0.952,,entity,0.0
+10 name particles,RRN,19,,,,1.0,1.0,1.0,,entity,0.0
+11 name parts,all,205,213.0,10.0,0.953,0.985,0.976,0.98,0.969,overall,0.015
+11 name parts,documentation,62,65.0,2.0,0.969,1.0,0.968,0.984,0.984,location,0.032
+11 name parts,name,109,114.0,8.0,0.93,0.972,0.972,0.972,0.951,location,0.009
+11 name parts,text,34,34.0,0.0,1.0,1.0,1.0,1.0,1.0,location,0.0
+11 name parts,ADDRESS,14,,,,1.0,1.0,1.0,,entity,0.0
+11 name parts,DATE_OF_BIRTH,8,,,,1.0,1.0,1.0,,entity,0.0
+11 name parts,EMAIL,20,,,,1.0,1.0,1.0,,entity,0.0
+11 name parts,IBAN,12,,,,1.0,1.0,1.0,,entity,0.0
+11 name parts,KBO,8,,,,1.0,1.0,1.0,,entity,0.0
+11 name parts,LICENSE_PLATE,8,,,,1.0,1.0,1.0,,entity,0.0
+11 name parts,PERSON,95,,,,0.968,0.947,0.968,,entity,0.032
+11 name parts,PHONE,21,,,,1.0,1.0,0.952,,entity,0.0
+11 name parts,RRN,19,,,,1.0,1.0,1.0,,entity,0.0
