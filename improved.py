@@ -8,6 +8,7 @@ improvement on top of that.
 
 import re
 import xml.etree.ElementTree as ET
+from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from functools import cache, lru_cache
@@ -57,6 +58,12 @@ class PipelineConfig:
     scan_text_elements: bool = False  # also <documentation> and <textAnnotation><text>
     belgian_recognizers: bool = (
         False  # BE phone, KBO, plates, addresses, DOB, RRN with spaces
+    )
+    extend_names: bool = False  # grow PERSON matches over surname particles
+    mask_name_parts: bool = False  # with dedup: also mask the parts of approved names
+    whole_document: bool = False  # analyze one text per diagram instead of per element
+    document_labels: bool = (
+        False  # with whole_document: prefix lines with the element type
     )
 
     def __hash__(self):
@@ -230,6 +237,43 @@ def filter_overlaps(spans: list) -> list:
 
 ACRONYM = re.compile(r"^[A-Z0-9]{2,6}$")
 
+# Surname particles (Dutch, French, Arabic, ...); matched case-insensitively
+NAME_PARTICLES = (
+    "van", "de", "der", "den", "het", "ter", "ten", "te", "vanden", "vander",
+    "el", "al", "le", "la", "du", "da", "di", "dos", "von",
+)  # fmt: skip
+_PARTICLE = "(?i:" + "|".join(NAME_PARTICLES) + ")"
+_CAP_WORD = r"[A-ZÀ-Ý][\w'’-]*"
+_NAME_WORD = rf"(?!{_PARTICLE}\b){_CAP_WORD}"  # capitalized, but not a particle
+# Spaces only (no newlines), so a name never grows into the next element
+NAME_RIGHT = re.compile(rf"((?: {_PARTICLE}\b)*) {_NAME_WORD}")
+NAME_LEFT = re.compile(rf"(?<![\w'’-])((?:{_NAME_WORD} )?)((?:{_PARTICLE} )*)$")
+
+# Counters for the notebook (analyze calls, detections crossing element boundaries)
+STATS: Counter = Counter()
+
+
+def _is_particle(word: str) -> bool:
+    return word.lower() in NAME_PARTICLES
+
+
+def extend_name(text: str, start: int, end: int) -> tuple[int, int]:
+    """
+    Grow a PERSON span over surname particles, e.g. "Yusuf El" -> "Yusuf El Amrani",
+    "Velde" -> "Elke Van de Velde". Only where particles are involved, so
+    "Contact Koen" stays "Koen".
+    """
+    words = text[start:end].split()
+    if not words:
+        return start, end
+    right = NAME_RIGHT.match(text, end)
+    if right and (right.group(1) or _is_particle(words[-1])):
+        end = right.end()
+    left = NAME_LEFT.search(text, 0, start)
+    if left and (left.group(2) or _is_particle(words[0])) and left.group(0):
+        start = left.start()
+    return start, end
+
 
 def detect_text(text: str, cfg: PipelineConfig) -> list:
     """detect_pii from the service, plus the switched-on improvements."""
@@ -252,6 +296,7 @@ def detect_text(text: str, cfg: PipelineConfig) -> list:
             allow_list_match="regex",
         )
 
+    STATS["analyze_calls"] += 1
     try:
         raw = analyze("nl")
     except ValueError:
@@ -259,6 +304,8 @@ def detect_text(text: str, cfg: PipelineConfig) -> list:
 
     results = []
     for r in raw:
+        if cfg.extend_names and r.entity_type == "PERSON":
+            r.start, r.end = extend_name(text, r.start, r.end)
         match = text[r.start : r.end]
         if r.score < cfg.thresholds.get(r.entity_type, cfg.default_threshold):
             continue
@@ -307,12 +354,79 @@ def text_elements(root: ET.Element, cfg: PipelineConfig) -> list:
     return out
 
 
+# Line prefixes for document_labels
+ELEMENT_LABELS = {
+    "participant": "Pool", "lane": "Lane",
+    "task": "Taak", "userTask": "Taak", "manualTask": "Taak", "serviceTask": "Taak",
+    "startEvent": "Start", "endEvent": "Einde", "exclusiveGateway": "Beslissing",
+    "sequenceFlow": "Pijl", "messageFlow": "Bericht", "dataObjectReference": "Gegevens",
+    "documentation": "Documentatie", "text": "Notitie",
+}  # fmt: skip
+
+
+def bpmn_document(xml: str, cfg: PipelineConfig) -> tuple[str, list[dict]]:
+    """
+    All scanned text of a diagram as one document, one element per line in document
+    order (an element's name, then its documentation). Lines without closing
+    punctuation get a "." so the NLP model sees sentence boundaries.
+
+    Returns (text, segments); each segment maps text[start:end] back to
+    (element_id, location) and equals that element's stripped text.
+    """
+    root = ET.fromstring(xml)
+    order = {el: i for i, el in enumerate(root.iter())}
+    elements = sorted(text_elements(root, cfg), key=lambda t: order[t[0]])
+    lines, segments, pos = [], [], 0
+    for el, element_id, location, text in elements:
+        tag = el.tag.split("}")[-1] if location == "name" else location
+        prefix = f"{ELEMENT_LABELS.get(tag, tag)}: " if cfg.document_labels else ""
+        line = prefix + text + ("\n" if text[-1] in ".!?:" else ".\n")
+        start = pos + len(prefix)
+        segments.append(
+            {
+                "start": start,
+                "end": start + len(text),
+                "element_id": element_id,
+                "location": location,
+            }
+        )
+        lines.append(line)
+        pos += len(line)
+    return "".join(lines), segments
+
+
 def detect_bpmn(xml: str, cfg: PipelineConfig) -> list:
+    if cfg.whole_document:
+        return _detect_document(xml, cfg)
     root = ET.fromstring(xml)
     detections = []
     for _, element_id, location, text in text_elements(root, cfg):
         for d in detect_text(text, cfg):
             detections.append({"element_id": element_id, "location": location, **d})
+    return detections
+
+
+def _detect_document(xml: str, cfg: PipelineConfig) -> list:
+    """One analyze call for the whole diagram; detections mapped back to the elements."""
+    text, segments = bpmn_document(xml, cfg)
+    detections = []
+    for d in detect_text(text, cfg):
+        hits = [g for g in segments if d["start"] < g["end"] and g["start"] < d["end"]]
+        if len(hits) > 1:
+            STATS["crossing_boundary"] += 1
+        if not hits:
+            STATS["outside_elements"] += 1  # e.g. only on a line prefix
+        for g in hits:
+            start, end = max(d["start"], g["start"]), min(d["end"], g["end"])
+            detections.append({
+                "element_id": g["element_id"],
+                "location": g["location"],
+                "start": start - g["start"],
+                "end": end - g["start"],
+                "entity": d["entity"],
+                "score": d["score"],
+                "match": text[start:end],
+            })  # fmt: skip
     return detections
 
 
@@ -346,6 +460,15 @@ def anonymize_bpmn(xml: str, approved: list, cfg: PipelineConfig) -> str:
     values = (
         {d["match"] for d in approved if d["match"].strip()} if cfg.dedup else set()
     )
+    # Parts of approved names, masked as whole words ("Lander" of "Lander Lambrecht")
+    allowed = {t.lower() for t in cfg.allow_list or ()}
+    name_parts = {
+        part
+        for d in approved
+        if d["entity"] == "PERSON"
+        for part in re.findall(r"[\w'’-]+", d["match"])
+        if len(part) >= 3 and not _is_particle(part) and part.lower() not in allowed
+    } if cfg.dedup and cfg.mask_name_parts else set()  # fmt: skip
 
     for el, element_id, location, text in text_elements(root, cfg):
         spans = list(by_key.get((element_id, location), []))
@@ -353,6 +476,11 @@ def anonymize_bpmn(xml: str, approved: list, cfg: PipelineConfig) -> str:
             spans += [
                 {"start": m.start(), "end": m.end()}
                 for m in re.finditer(re.escape(value), text)
+            ]
+        for part in name_parts:
+            spans += [
+                {"start": m.start(), "end": m.end()}
+                for m in re.finditer(rf"(?<!\w){re.escape(part)}(?!\w)", text)
             ]
         if not spans:
             continue
