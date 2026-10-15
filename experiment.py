@@ -1,7 +1,7 @@
 """
 Run one pipeline configuration on the corpus and score it.
 
-Shared by 02_improvements.ipynb and 03_one_text_per_diagram.ipynb, so both
+Shared by 01_improvements.ipynb and 02_input_formats.ipynb, so both
 notebooks measure their steps in exactly the same way.
 """
 

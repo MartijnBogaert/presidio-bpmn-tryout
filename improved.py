@@ -2,7 +2,7 @@
 Configurable version of the PII pipeline, to switch improvements on one by one.
 
 With the default PipelineConfig() the detections are identical to
-baseline_service (checked in 02_improvements.ipynb); every field switches one
+baseline_service (checked in 01_improvements.ipynb); every field switches one
 improvement on top of that.
 """
 
@@ -676,7 +676,7 @@ def anonymize_bpmn(xml: str, approved: list, cfg: PipelineConfig) -> str:
 
 
 ########################################################################
-# The cumulative improvement steps (notebooks 02 and 03)
+# The cumulative improvement steps (notebook 01) and input formats (notebook 02)
 ########################################################################
 
 # Step 2: NER results always score 0.85, so only the pattern-based bars really change
@@ -724,3 +724,13 @@ def changed_settings(prev: PipelineConfig, cfg: PipelineConfig) -> dict:
         for f in fields(cfg)
         if f.name != "name" and getattr(prev, f.name) != getattr(cfg, f.name)
     }
+
+
+# How the text of a diagram is given to the detector (notebook 02): name -> settings
+INPUT_FORMATS = {
+    "per element": {},
+    "one text": {"whole_document": True, "document_layout": "lines"},
+    "one text + type": {"whole_document": True, "document_layout": "typed"},
+    "flow order": {"whole_document": True, "document_layout": "flow"},
+    "story": {"whole_document": True, "document_layout": "story"},
+}
