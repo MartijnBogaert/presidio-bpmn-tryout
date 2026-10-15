@@ -232,6 +232,17 @@ NAME_CLEAN = [
     "Dossiernummer {casenr} aanmaken", "Agenderen gemeenteraad",
     "Betaling ontvangen", "Archiveren dossier",
 ]
+# OPH jargon: system names, acronyms, CamelCase and single words that recur across
+# real diagrams and that NER tends to flag as PERSON / LOCATION / ORGANIZATION.
+NAME_JARGON = [
+    "DOSIS", "ADM", "ICM", "FOX", "eID", "BOSA", "VDAB", "OCMW", "CSAM", "MAGDA",
+    "GaNaar", "NaKijken", "Afgerond", "Herinnering", "Authentication", "Moraliteitsonderzoek",
+    "Mercurius", "Burgerprofiel", "eBox", "SharePoint",
+    "Registratie in DOSIS", "ICM-ticket aanmaken", "Check KBO", "Afgerond?",
+    "Herinnering versturen", "Moraliteitsonderzoek aanvragen", "Inbox ADM", "GaNaar loket",
+    "Upload in FOX", "Aanmelden via eID", "Melding aan VDAB", "Doorverwijzen naar OCMW",
+    "Nazicht BOSA", "Authentication via CSAM", "Opvragen in MAGDA", "Bericht in eBox",
+]
 # Lanes and participants named after a person (happens in practice)
 LANE_PII = ["{name}", "{first} - Burgerzaken", "{name} (dossierbeheerder)"]
 
@@ -506,6 +517,8 @@ class Builder:
                 label = self.text(self.cyclers["NAME_PII"].next())
             elif roll < 0.5:
                 label = self.text(self.cyclers["NAME_CLEAN"].next())
+            elif roll < 0.75:
+                label = self.text(self.cyclers["NAME_JARGON"].next())
             else:
                 label = (task_name, [])
             tag = r.choice(["task", "userTask", "userTask", "manualTask", "serviceTask"])
@@ -517,7 +530,8 @@ class Builder:
             if i == 0:
                 gateway = self.named(process, "exclusiveGateway", "Gateway", (proc["gateway"], []))
                 nodes.append(gateway)
-        end_ok = self.named(process, "endEvent", "Event", (proc["end"], []))
+        end_label = self.text(self.cyclers["NAME_JARGON"].next()) if r.random() < 0.5 else (proc["end"], [])
+        end_ok = self.named(process, "endEvent", "Event", end_label)
         end_nok = self.named(process, "endEvent", "Event", ("Aanvraag geweigerd", []))
         nodes.append(end_ok)
 
@@ -540,8 +554,9 @@ class Builder:
         for i, node in enumerate(nodes + [end_nok]):
             ET.SubElement(lanes[i % len(lanes)], q("flowNodeRef")).text = node.get("id")
 
-        # Data objects, sometimes with a person in the name
-        for data_name in proc["data"]:
+        # Data objects (some named after the system they live in), sometimes with a person in the name
+        jargon_data = [self.cyclers["NAME_JARGON"].next() for _ in range(r.randint(1, 3))]
+        for data_name in proc["data"] + jargon_data:
             data_obj_id = self.new_id("DataObject")
             if r.random() < 0.3:
                 label = self.text(self.cyclers["NAME_PII"].next())
@@ -600,7 +615,7 @@ def main():
     rng = random.Random(args.seed)
     faker = Faker(rng)
     cyclers = {name: Cycler(globals()[name], rng) for name in
-               ["NAME_PII", "NAME_CLEAN", "DOC_PII", "DOC_CLEAN", "ANNOT_PII", "ANNOT_CLEAN"]}
+               ["NAME_PII", "NAME_CLEAN", "NAME_JARGON", "DOC_PII", "DOC_CLEAN", "ANNOT_PII", "ANNOT_CLEAN"]}
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     for old in out.glob("*.bpmn"):
