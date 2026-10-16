@@ -159,18 +159,25 @@ Results with all improvements switched on:
 
 | Model | How the text is given | Precision | Fully covered | **Left after anonymizing** | False alarms | Time for 20 diagrams |
 |---|---|---|---|---|---|---|
-| md | per label | 0.95 | 98% | 1.5% | 10 | ≈2 s |
-| md | one text | 0.99 | 94% | 2.0% | 2 | ≈0.5–1 s |
-| lg | per label | 0.99 | 96% | 2.0% | 2 | ≈2 s |
-| lg | one text | 1.00 | 96% | 2.0% | 0 | ≈0.5–1 s |
-| lg | story | 0.99 | 97% | 2.4% | 3 | ≈0.7 s |
-| transformer | per label | 0.98 | 95% | **0.5%** | 5 | ≈19 s |
-| transformer | one text | 0.93 | 94% | 1.5% | 14 | ≈5 s |
-| transformer | story | 0.93 | 93% | 1.5% | 15 | ≈8 s |
+| md | per label | 0.953 | 97.6% | 1.5% | 10 | ≈1.7 s |
+| md | one text | 0.990 | 93.7% | 2.0% | 2 | ≈1.1 s |
+| md | one text + element type | 0.980 | 95.6% | 2.4% | 4 | ≈0.6 s |
+| md | flow order | 0.980 | 95.6% | 2.4% | 4 | ≈0.5 s |
+| md | story | 0.961 | 95.1% | 2.4% | 8 | ≈0.7 s |
+| lg | per label | 0.990 | 96.1% | 2.0% | 2 | ≈1.7 s |
+| lg | one text | 1.000 | 95.6% | 2.0% | 0 | ≈1.0 s |
+| lg | one text + element type | 0.980 | 96.1% | 2.4% | 4 | ≈0.6 s |
+| lg | flow order | 0.980 | 96.1% | 2.4% | 4 | ≈0.5 s |
+| lg | story | 0.985 | 97.1% | 2.4% | 3 | ≈0.7 s |
+| transformer | per label | 0.975 | 94.6% | **0.5%** | 5 | ≈19.2 s |
+| transformer | one text | 0.933 | 93.7% | 1.5% | 14 | ≈5.3 s |
+| transformer | one text + element type | 0.930 | 94.6% | 1.5% | 15 | ≈6.9 s |
+| transformer | flow order | 0.900 | 94.6% | 1.0% | 22 | ≈6.7 s |
+| transformer | story | 0.929 | 93.2% | 1.5% | 15 | ≈7.7 s |
 
-All three models were tested with every way of giving the text (per label, one text, one text with element types,
-flow order, story), with all improvements switched on; the table shows the most telling combinations. The full table
-is in notebook `03_models.ipynb`.
+Every model was tested with every way of giving the text, with all improvements switched on (step 11). "Flow order"
+is the one text with element types, ordered along the process; "story" is the same order told in sentences (see
+section 4). Times are for detection only, on a normal laptop without a graphics card.
 
 - **The bigger vocabulary (lg)** mostly means fewer false alarms, at the same speed. It also recognizes
   `Tom - Burgerzaken` as a person, even inside a story.
