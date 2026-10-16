@@ -5,7 +5,8 @@ Experiments to improve PII detection in BPMN files with Presidio, starting from 
 
 ## Notebooks
 
-Start with `04_overview.ipynb` for the results; the other notebooks hold the details.
+For a plain-language summary of the setup and results, read [FINDINGS.md](FINDINGS.md).
+Start with `04_overview.ipynb` for the numbers; the other notebooks hold the details.
 
 | Notebook | Question | Writes |
 |---|---|---|
