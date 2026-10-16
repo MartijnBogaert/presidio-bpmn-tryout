@@ -132,7 +132,7 @@ Daarna volgt de beslissing: Aanvraag volledig?
 Bij antwoord Ja gaat het verder met stap 2.
 ```
 
-What we found, with the current language model:
+What we found with the **current language model** (md); section 5 repeats this test with the other models:
 
 - **One text is 3–4× faster** (one check per diagram instead of one per label) and gives **fewer false alarms**: in a
   sentence, "Adviezen" and "Opgelet" are no longer mistaken for names.
@@ -160,15 +160,29 @@ Results with all improvements switched on:
 | Model | How the text is given | Precision | Fully covered | **Left after anonymizing** | False alarms | Time for 20 diagrams |
 |---|---|---|---|---|---|---|
 | md | per label | 0.95 | 98% | 1.5% | 10 | ≈2 s |
+| md | one text | 0.99 | 94% | 2.0% | 2 | ≈0.5–1 s |
 | lg | per label | 0.99 | 96% | 2.0% | 2 | ≈2 s |
 | lg | one text | 1.00 | 96% | 2.0% | 0 | ≈0.5–1 s |
+| lg | story | 0.99 | 97% | 2.4% | 3 | ≈0.7 s |
 | transformer | per label | 0.98 | 95% | **0.5%** | 5 | ≈19 s |
+| transformer | one text | 0.93 | 94% | 1.5% | 14 | ≈5 s |
+| transformer | story | 0.93 | 93% | 1.5% | 15 | ≈8 s |
+
+All three models were tested with every way of giving the text (per label, one text, one text with element types,
+flow order, story), with all improvements switched on; the table shows the most telling combinations. The full table
+is in notebook `03_models.ipynb`.
 
 - **The bigger vocabulary (lg)** mostly means fewer false alarms, at the same speed. It also recognizes
   `Tom - Burgerzaken` as a person, even inside a story.
-- **The careful reader (transformer)** leaves the least personal data behind: 0.5%. It finds names the others miss
-  (`Doorsturen naar Lander Yilmaz`). The price: it is about 10× slower without a graphics card, and inside one big text
-  it starts calling lanes like "Burger" and "Brandweer" persons.
+- **The careful reader (transformer)** leaves the least personal data behind when it checks **label by label**: 0.5%.
+  It finds names the others miss (`Doorsturen naar Lander Yilmaz`). The price: it is about 10× slower without a
+  graphics card.
+- **Giving the transformer the whole diagram at once does not help it.** One text is about 3–4× faster for it too,
+  but it raises many more false alarms (14 instead of 5): between other lines, lane and role names like "Burger",
+  "Brandweer" and "Melder", and even the title "dhr." in "dhr. Janssens", look like persons to it. More personal data
+  is also left behind (1.5% instead of 0.5%). The story does not change that.
+- **So the "whole diagram" idea works best with lg**: no false alarms in one text, and the story covers the most of
+  all one-text options (97%).
 - **A configuration pitfall:** the transformer splits rare words into pieces ("Huysmans" → "Huys" + "mans"). With the
   standard setting, it often forgot the second piece and found only "Annelies" in "Annelies Huysmans". With the right
   setting, it finds the full name. This one setting made the difference between 84% and 95% fully covered.
