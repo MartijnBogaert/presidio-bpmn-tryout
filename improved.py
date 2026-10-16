@@ -11,7 +11,7 @@ import xml.etree.ElementTree as ET
 from collections import Counter
 from collections.abc import Callable
 from dataclasses import dataclass, field, fields, replace
-from functools import cache, lru_cache
+from functools import cache
 from io import StringIO
 from pathlib import Path
 
@@ -65,6 +65,9 @@ class PipelineConfig:
     # with whole_document: "lines" (XML order), "typed" (+ element type per line),
     # "flow" (typed, in process-flow order) or "story" (flow order, framed as sentences)
     document_layout: str = "lines"
+    ner_model: str = (
+        "md"  # "md" (the service's model), "lg" or "transformer", see NER_MODELS
+    )
 
     def __hash__(self):
         return hash(repr(self))
@@ -198,30 +201,85 @@ def belgian_recognizers() -> list:
 ########################################################################
 
 
-@lru_cache(maxsize=1)
-def nlp_engine():
-    """Same NLP configuration as baseline_service/identification.py; built once."""
-    return NlpEngineProvider(
-        nlp_configuration={
-            "nlp_engine_name": "spacy",
-            "models": [
-                {"lang_code": "nl", "model_name": "nl_core_news_md"},
-                {"lang_code": "en", "model_name": "en_core_web_md"},
-            ],
-        }
-    ).create_engine()
+# NER models (notebook 03). "md" is the configuration of baseline_service/identification.py.
+TRANSFORMER_NER = (
+    "wietsedv/bert-base-dutch-cased-finetuned-conll2002-ner"  # BERTje, CoNLL-2002
+)
+NER_MODELS = {
+    "md": {
+        "nlp_engine_name": "spacy",
+        "models": [
+            {"lang_code": "nl", "model_name": "nl_core_news_md"},
+            {"lang_code": "en", "model_name": "en_core_web_md"},
+        ],
+    },
+    "lg": {
+        "nlp_engine_name": "spacy",
+        "models": [
+            {"lang_code": "nl", "model_name": "nl_core_news_lg"},
+            {"lang_code": "en", "model_name": "en_core_web_md"},
+        ],
+    },
+    "transformer": {
+        "nlp_engine_name": "transformers",
+        "models": [
+            {
+                "lang_code": "nl",
+                # spaCy only tokenizes here; the transformer does the NER
+                "model_name": {
+                    "spacy": "nl_core_news_md",
+                    "transformers": TRANSFORMER_NER,
+                },
+            }
+        ],
+        "ner_model_configuration": {
+            "labels_to_ignore": ["O"],
+            # "first": a word gets the label of its first word piece. Presidio's default "max"
+            # loses the last part of names that BERTje splits ("Huys" + "##mans"), see notebook 03.
+            "aggregation_strategy": "first",
+            "alignment_mode": "expand",
+            # BERTje's CoNLL-2002 labels, lower- and uppercase
+            "model_to_presidio_entity_mapping": {
+                label: entity
+                for short, entity in [
+                    ("per", "PERSON"),
+                    ("loc", "LOCATION"),
+                    ("org", "ORGANIZATION"),
+                    ("misc", "MISC"),
+                ]
+                for label in (short, short.upper())
+            },
+        },
+    },
+}
 
 
-def spacy_model(language: str = "nl"):
-    """The spaCy model that Presidio uses for a language (for inspecting NER output)."""
-    engine = nlp_engine()
+@cache
+def nlp_engine(model: str = "md"):
+    """The Presidio NLP engine for a model in NER_MODELS; built once per model."""
+    return NlpEngineProvider(nlp_configuration=NER_MODELS[model]).create_engine()
+
+
+def spacy_model(language: str = "nl", model: str = "md"):
+    """The spaCy pipeline that Presidio uses for a language and model (for inspecting NER output)."""
+    engine = nlp_engine(model)
     assert isinstance(engine, SpacyNlpEngine) and engine.nlp is not None
     return engine.nlp[language]
 
 
+def ner_entities(doc) -> list:
+    """(text, label) of the NER entities in a doc from spacy_model(): doc.ents for spaCy models,
+    the span group of the transformer pipeline otherwise."""
+    spans = doc.spans.get("bert-base-ner", doc.ents)
+    return [(span.text, span.label_, span.start_char, span.end_char) for span in spans]
+
+
 @cache
 def build_analyzer(cfg: PipelineConfig) -> AnalyzerEngine:
-    analyzer = AnalyzerEngine(nlp_engine=nlp_engine(), supported_languages=["nl", "en"])
+    languages = [m["lang_code"] for m in NER_MODELS[cfg.ner_model]["models"]]
+    analyzer = AnalyzerEngine(
+        nlp_engine=nlp_engine(cfg.ner_model), supported_languages=languages
+    )
     analyzer.registry.add_recognizer(
         rrn_recognizer(cfg.rrn_checksum, spaces=cfg.belgian_recognizers)
     )
@@ -332,7 +390,7 @@ def detect_text(text: str, cfg: PipelineConfig) -> list:
                 "start": r.start,
                 "end": r.end,
                 "entity": r.entity_type,
-                "score": round(r.score, 3),
+                "score": round(float(r.score), 3),
                 "match": match,
             }
         )

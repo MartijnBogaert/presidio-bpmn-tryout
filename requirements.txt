@@ -5,3 +5,6 @@ ipykernel
 nbconvert
 nbformat
 matplotlib
+# Notebook 03 (models): transformer NER; torch itself is installed CPU-only by setup.sh
+transformers<5
+spacy-huggingface-pipelines

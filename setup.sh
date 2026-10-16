@@ -6,11 +6,15 @@ cd "$(dirname "$0")"
 
 python3 -m venv .venv
 .venv/bin/pip install --upgrade pip
+# CPU-only torch (for the transformer NER model of notebook 03); much smaller than the CUDA build
+.venv/bin/pip install torch --index-url https://download.pytorch.org/whl/cpu
 .venv/bin/pip install -r requirements.txt
 
 # Same models as the service's Dockerfile
 .venv/bin/python -m spacy download nl_core_news_md
 .venv/bin/python -m spacy download en_core_web_md
+# The larger Dutch model, compared in notebook 03 (the transformer model downloads on first use)
+.venv/bin/python -m spacy download nl_core_news_lg
 
 .venv/bin/python -m ipykernel install --user --name presidio-bpmn-tryout \
   --display-name "Python (presidio-bpmn-tryout)"
