@@ -623,3 +623,42 @@ transformer,story,11 name parts,LICENSE_PLATE,8,,,,1.0,1.0,1.0,,entity,0.0
 transformer,story,11 name parts,PERSON,95,,,,0.874,0.853,0.874,,entity,0.032
 transformer,story,11 name parts,PHONE,21,,,,1.0,1.0,0.952,,entity,0.0
 transformer,story,11 name parts,RRN,19,,,,1.0,1.0,1.0,,entity,0.0
+dapas defaults,one text + type,dapas defaults,all,205,291.0,104.0,0.643,0.888,0.805,0.824,0.746,overall,0.2
+dapas defaults,one text + type,dapas defaults,documentation,62,74.0,18.0,0.757,0.871,0.774,0.806,0.81,location,0.274
+dapas defaults,one text + type,dapas defaults,name,109,173.0,74.0,0.572,0.89,0.826,0.807,0.697,location,0.156
+dapas defaults,one text + type,dapas defaults,text,34,44.0,12.0,0.727,0.912,0.794,0.912,0.809,location,0.206
+dapas defaults,one text + type,dapas defaults,ADDRESS,14,,,,1.0,0.0,1.0,,entity,1.0
+dapas defaults,one text + type,dapas defaults,DATE_OF_BIRTH,8,,,,0.0,0.0,0.0,,entity,1.0
+dapas defaults,one text + type,dapas defaults,EMAIL,20,,,,1.0,1.0,1.0,,entity,0.0
+dapas defaults,one text + type,dapas defaults,IBAN,12,,,,1.0,1.0,1.0,,entity,0.0
+dapas defaults,one text + type,dapas defaults,KBO,8,,,,1.0,1.0,0.0,,entity,0.0
+dapas defaults,one text + type,dapas defaults,LICENSE_PLATE,8,,,,0.0,0.0,0.0,,entity,1.0
+dapas defaults,one text + type,dapas defaults,PERSON,95,,,,0.968,0.937,0.916,,entity,0.053
+dapas defaults,one text + type,dapas defaults,PHONE,21,,,,0.81,0.81,0.81,,entity,0.19
+dapas defaults,one text + type,dapas defaults,RRN,19,,,,1.0,1.0,1.0,,entity,0.105
+dapas tuned,one text + type,dapas tuned,all,205,211.0,12.0,0.943,0.888,0.8,0.844,0.915,overall,0.122
+dapas tuned,one text + type,dapas tuned,documentation,62,58.0,1.0,0.983,0.871,0.823,0.823,0.923,location,0.145
+dapas tuned,one text + type,dapas tuned,name,109,120.0,8.0,0.933,0.917,0.807,0.872,0.925,location,0.083
+dapas tuned,one text + type,dapas tuned,text,34,33.0,3.0,0.909,0.824,0.735,0.794,0.864,location,0.206
+dapas tuned,one text + type,dapas tuned,ADDRESS,14,,,,0.071,0.0,0.0,,entity,1.0
+dapas tuned,one text + type,dapas tuned,DATE_OF_BIRTH,8,,,,1.0,1.0,1.0,,entity,0.0
+dapas tuned,one text + type,dapas tuned,EMAIL,20,,,,1.0,1.0,1.0,,entity,0.0
+dapas tuned,one text + type,dapas tuned,IBAN,12,,,,1.0,1.0,1.0,,entity,0.0
+dapas tuned,one text + type,dapas tuned,KBO,8,,,,1.0,1.0,0.0,,entity,0.0
+dapas tuned,one text + type,dapas tuned,LICENSE_PLATE,8,,,,1.0,1.0,1.0,,entity,0.0
+dapas tuned,one text + type,dapas tuned,PERSON,95,,,,0.937,0.758,0.937,,entity,0.074
+dapas tuned,one text + type,dapas tuned,PHONE,21,,,,0.81,0.81,0.81,,entity,0.19
+dapas tuned,one text + type,dapas tuned,RRN,19,,,,1.0,1.0,1.0,,entity,0.0
+dapas tuned + extras,one text + type,dapas tuned + extras,all,205,219.0,12.0,0.945,0.951,0.893,0.912,0.948,overall,0.039
+dapas tuned + extras,one text + type,dapas tuned + extras,documentation,62,64.0,1.0,0.984,0.968,0.919,0.919,0.976,location,0.048
+dapas tuned + extras,one text + type,dapas tuned + extras,name,109,121.0,8.0,0.934,0.954,0.872,0.908,0.944,location,0.037
+dapas tuned + extras,one text + type,dapas tuned + extras,text,34,34.0,3.0,0.912,0.912,0.912,0.912,0.912,location,0.029
+dapas tuned + extras,one text + type,dapas tuned + extras,ADDRESS,14,,,,1.0,1.0,1.0,,entity,0.0
+dapas tuned + extras,one text + type,dapas tuned + extras,DATE_OF_BIRTH,8,,,,1.0,1.0,1.0,,entity,0.0
+dapas tuned + extras,one text + type,dapas tuned + extras,EMAIL,20,,,,1.0,1.0,1.0,,entity,0.0
+dapas tuned + extras,one text + type,dapas tuned + extras,IBAN,12,,,,1.0,1.0,1.0,,entity,0.0
+dapas tuned + extras,one text + type,dapas tuned + extras,KBO,8,,,,1.0,1.0,0.0,,entity,0.0
+dapas tuned + extras,one text + type,dapas tuned + extras,LICENSE_PLATE,8,,,,1.0,1.0,1.0,,entity,0.0
+dapas tuned + extras,one text + type,dapas tuned + extras,PERSON,95,,,,0.937,0.811,0.937,,entity,0.042
+dapas tuned + extras,one text + type,dapas tuned + extras,PHONE,21,,,,0.81,0.81,0.81,,entity,0.19
+dapas tuned + extras,one text + type,dapas tuned + extras,RRN,19,,,,1.0,1.0,1.0,,entity,0.0

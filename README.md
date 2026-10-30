@@ -13,7 +13,7 @@ Start with `04_overview.ipynb` for the numbers; the other notebooks hold the det
 | `00_baseline.ipynb` | How good is the current service? | `results/baseline.csv` |
 | `01_improvements.ipynb` | **What** to detect and filter: improvement steps 0–11, each element analyzed on its own | `results/steps.csv` |
 | `02_input_formats.ipynb` | **How** to give the text to the detector: per element, one text per diagram, flow order, story (same steps 0–11) | `results/input_formats.csv` |
-| `03_models.ipynb` | **Which** NER model: spaCy md (current) vs. spaCy lg vs. a Dutch transformer (BERTje), on the same steps and input formats | `results/models.csv` |
+| `03_models.ipynb` | **Which** NER model: spaCy md (current) vs. spaCy lg vs. a Dutch transformer (BERTje), on the same steps and input formats; plus the external DAPAS API | `results/models.csv` |
 | `04_overview.ipynb` | What came out? Summary of the results files | – |
 
 ## Setup
@@ -31,7 +31,8 @@ for nb in 00_baseline 01_improvements 02_input_formats 03_models 04_overview; do
 done
 ```
 
-Notebook 03 needs the extra models from `setup.sh` (`nl_core_news_lg`, torch, transformers); the BERTje NER model
+The DAPAS part of notebook 03 needs the API credentials in a `.env` file (git-ignored, variables listed in
+`dapas.py`); without it, that part is skipped. Notebook 03 also needs the extra models from `setup.sh` (`nl_core_news_lg`, torch, transformers); the BERTje NER model
 (~0.4 GB) downloads from Hugging Face on first use. On CPU it takes several minutes.
 
 ## Code
@@ -41,6 +42,7 @@ Notebook 03 needs the extra models from `setup.sh` (`nl_core_news_lg`, torch, tr
 | `baseline_service/` | Copy of the service's detection, anonymization and BPMN code (commit `d01e7ee`, MIT), plus `endpoints.py` with the `/bpmn/identify` and `/bpmn/anonymize` logic from `web.py` |
 | `generate_bpmn.py` | Generates synthetic Dutch BPMN files with fictitious PII, OPH jargon, and a `ground_truth.json` |
 | `improved.py` | Configurable pipeline: every improvement is a switch on `PipelineConfig` (all off = baseline); `cumulative_steps()` defines steps 0–11, `INPUT_FORMATS` the input formats, `NER_MODELS` the NER models |
+| `dapas.py` | Client for the DAPAS API (credentials from `.env`, never printed) |
 | `experiment.py` | Runs and scores one configuration on the corpus (used by notebooks 01–03) |
 | `pii_eval.py` | Loads the corpus and scores detections (precision, recall, residual PII after anonymization, step diffs) |
 | `allow_list.txt` | Domain terms that are never PII (used from step 3) |

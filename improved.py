@@ -68,6 +68,10 @@ class PipelineConfig:
     ner_model: str = (
         "md"  # "md" (the service's model), "lg" or "transformer", see NER_MODELS
     )
+    # "presidio" (all of the above) or "dapas": the external DAPAS API detects instead
+    # (whole_document only); with belgian_recognizers our pattern recognizers are added
+    detector: str = "presidio"
+    dapas_setup: str = "defaults"  # see DAPAS_SETUPS
 
     def __hash__(self):
         return hash(repr(self))
@@ -342,6 +346,8 @@ def extend_name(text: str, start: int, end: int) -> tuple[int, int]:
 
 def detect_text(text: str, cfg: PipelineConfig) -> list:
     """detect_pii from the service, plus the switched-on improvements."""
+    if cfg.detector == "dapas":
+        return _detect_dapas(text, cfg)
     analyzer = build_analyzer(cfg)
     entities = list(cfg.entities) if cfg.entities else None
     # Anchored regexes: a term only suppresses a detection that is exactly that term.
@@ -394,6 +400,84 @@ def detect_text(text: str, cfg: PipelineConfig) -> list:
                 "match": match,
             }
         )
+    return filter_overlaps(results)
+
+
+########################################################################
+# External detector: the DAPAS API (notebook 03)
+########################################################################
+
+# DAPAS types that are not personal data on their own, left out of the tuned setups
+DAPAS_NOT_PERSONAL = {"LOCATION", "ORGANIZATION", "GEMEENTE", "NUMMER", "DATUM", "URL"}
+DAPAS_PERSON_TYPES = {"PERSON", "VOORNAAM", "ACHTERNAAM"}
+# Our recognizers added in the "+ extras" setup (pattern-based, no NER)
+EXTRA_PATTERN_ENTITIES = ("BE_ADDRESS", "BE_LICENSE_PLATE", "DATE_OF_BIRTH")
+
+
+def dapas_options(setup: str) -> dict:
+    """The DAPAS API options of a setup in DAPAS_SETUPS."""
+    import dapas  # only needed when DAPAS is used
+
+    if setup == "defaults":
+        return {}
+    if setup == "tuned":
+        types = [t for t in dapas.entities()["entities"] if t not in DAPAS_NOT_PERSONAL]
+        return {
+            "entities": types,
+            "score_threshold": 0.6,
+            "allow_list": ["stopwords", *load_allow_list()],
+        }
+    raise ValueError(f"unknown DAPAS setup {setup!r}")
+
+
+def dapas_configs() -> dict[str, PipelineConfig]:
+    """The DAPAS setups compared in notebook 03, all on one text per diagram (one call each)."""
+    base = PipelineConfig(
+        detector="dapas",
+        scan_text_elements=True,
+        whole_document=True,
+        document_layout="typed",
+    )
+    return {
+        "dapas defaults": replace(base, name="dapas defaults", dapas_setup="defaults"),
+        "dapas tuned": replace(base, name="dapas tuned", dapas_setup="tuned"),
+        "dapas tuned + extras": replace(
+            base,
+            name="dapas tuned + extras",
+            dapas_setup="tuned",
+            belgian_recognizers=True,  # our address, license plate and birth-date patterns
+            extend_names=True,
+            dedup=True,
+            mask_name_parts=True,
+        ),
+    }
+
+
+def _detect_dapas(text: str, cfg: PipelineConfig) -> list:
+    """Detections by the DAPAS API, optionally merged with our pattern recognizers."""
+    import dapas
+
+    STATS["analyze_calls"] += 1
+    results = []
+    for d in dapas.analyze(text, dapas_options(cfg.dapas_setup)):
+        start, end = d["start"], d["end"]
+        if cfg.extend_names and d["entity"] in DAPAS_PERSON_TYPES:
+            start, end = extend_name(text, start, end)
+        results.append(
+            {
+                "start": start,
+                "end": end,
+                "entity": d["entity"],
+                "score": round(d["score"], 3),
+                "match": text[start:end],
+            }
+        )
+    if cfg.belgian_recognizers:
+        patterns = PipelineConfig(
+            belgian_recognizers=True, entities=EXTRA_PATTERN_ENTITIES
+        )
+        results += detect_text(text, patterns)
+        STATS["analyze_calls"] -= 1  # local pattern pass, not an API call
     return filter_overlaps(results)
 
 

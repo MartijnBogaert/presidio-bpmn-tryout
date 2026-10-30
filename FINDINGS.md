@@ -174,6 +174,9 @@ Results with all improvements switched on:
 | transformer | one text + element type | 0.930 | 94.6% | 1.5% | 15 | ≈6.9 s |
 | transformer | flow order | 0.900 | 94.6% | 1.0% | 22 | ≈6.7 s |
 | transformer | story | 0.929 | 93.2% | 1.5% | 15 | ≈7.7 s |
+| DAPAS API, defaults | one text + element type | 0.643 | 80.5% | 20.0% | 104 | ≈12.7 s (20 calls) |
+| DAPAS API, tuned | one text + element type | 0.943 | 80.0% | 12.2% | 12 | ≈15.1 s (20 calls) |
+| DAPAS API, tuned + our extras | one text + element type | 0.945 | 89.3% | 3.9% | 12 | ≈17.3 s (20 calls) |
 
 Every model was tested with every way of giving the text, with all improvements switched on (step 11). "Flow order"
 is the one text with element types, ordered along the process; "story" is the same order told in sentences (see
@@ -193,6 +196,23 @@ section 4). Times are for detection only, on a normal laptop without a graphics 
 - **A configuration pitfall:** the transformer splits rare words into pieces ("Huysmans" → "Huys" + "mans"). With the
   standard setting, it often forgot the second piece and found only "Annelies" in "Annelies Huysmans". With the right
   setting, it finds the full name. This one setting made the difference between 84% and 95% fully covered.
+
+
+### The DAPAS API
+
+DAPAS is a separate PII service for Dutch text (a large transformer model, GLiNER and pattern recognizers behind one
+API). To keep the number of calls low, it got **one call per diagram**, with the whole diagram as one text. We tried
+three setups: its **defaults**; **tuned** for BPMN (only personal-data types, a score threshold of 0.6, our allow-list);
+and **tuned plus our extras** (our address, license-plate and birth-date patterns, and our name handling).
+
+- **The defaults don't suit BPMN:** lanes and departments ("Jeugddienst", "Schepencollege") and town names are flagged
+  as organisations and places, giving 104 false alarms.
+- **Tuned plus our extras is the best DAPAS setup**, but still leaves 3.9% behind, against 1.5% for our pipeline with
+  the current model. It misses phone numbers written with a slash (`016/42.81.31`), takes role words like "Burger" and
+  "Bewoner" for persons, and takes case numbers for rijksregisternummers.
+- **Its strength is exactly our weak spot:** first names in short labels ("Marleen - Burgerzaken",
+  "Contact Inge (…)") that none of our models find. Combining DAPAS's first-name detection with our pipeline is worth
+  trying.
 
 ---
 
